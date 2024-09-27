@@ -7,13 +7,14 @@
 *.dll
 *.so
 *.dylib
-bloco-wallet-manager
+blocowallet
 *.DS_Store
 .wallets
 .wallets/wallets.db
 .wallets/keystore/
 .idea/
 .idea/*
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -28,4 +29,4 @@ go.work
 go.work.sum
 
 # env file
-.envblocowallet
+.env
