@@ -1,3 +1,4 @@
+// usecases/wallet_service.go
 package usecases
 
 import (
@@ -15,6 +16,13 @@ import (
 	"github.com/tyler-smith/go-bip39"
 )
 
+type WalletDetails struct {
+	Wallet     *entities.Wallet
+	Mnemonic   string
+	PrivateKey *ecdsa.PrivateKey
+	PublicKey  *ecdsa.PublicKey
+}
+
 type WalletService struct {
 	Repo     entities.WalletRepository
 	KeyStore *keystore.KeyStore
@@ -27,7 +35,7 @@ func NewWalletService(repo entities.WalletRepository, ks *keystore.KeyStore) *Wa
 	}
 }
 
-func (ws *WalletService) CreateWallet(password string) (*entities.Wallet, error) {
+func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
 	mnemonic, err := GenerateMnemonic()
 	if err != nil {
 		return nil, err
@@ -59,7 +67,7 @@ func (ws *WalletService) CreateWallet(password string) (*entities.Wallet, error)
 	wallet := &entities.Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
-		Mnemonic:     "", // Do not store the mnemonic
+		Mnemonic:     mnemonic, // Store the mnemonic
 	}
 
 	err = ws.Repo.AddWallet(wallet)
@@ -67,10 +75,17 @@ func (ws *WalletService) CreateWallet(password string) (*entities.Wallet, error)
 		return nil, err
 	}
 
-	return wallet, nil
+	walletDetails := &WalletDetails{
+		Wallet:     wallet,
+		Mnemonic:   mnemonic,
+		PrivateKey: privKey,
+		PublicKey:  &privKey.PublicKey,
+	}
+
+	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWallet(mnemonic, password string) (*entities.Wallet, error) {
+func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails, error) {
 	if !bip39.IsMnemonicValid(mnemonic) {
 		return nil, fmt.Errorf("invalid mnemonic phrase")
 	}
@@ -101,7 +116,7 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*entities.Wall
 	wallet := &entities.Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
-		Mnemonic:     "", // Do not store the mnemonic
+		Mnemonic:     mnemonic, // Store the mnemonic
 	}
 
 	err = ws.Repo.AddWallet(wallet)
@@ -109,23 +124,37 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*entities.Wall
 		return nil, err
 	}
 
-	return wallet, nil
+	walletDetails := &WalletDetails{
+		Wallet:     wallet,
+		Mnemonic:   mnemonic,
+		PrivateKey: privKey,
+		PublicKey:  &privKey.PublicKey,
+	}
+
+	return walletDetails, nil
+}
+
+func (ws *WalletService) LoadWallet(wallet *entities.Wallet, password string) (*WalletDetails, error) {
+	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading the wallet file: %v", err)
+	}
+	key, err := keystore.DecryptKey(keyJSON, password)
+	if err != nil {
+		return nil, fmt.Errorf("incorrect password")
+	}
+
+	walletDetails := &WalletDetails{
+		Wallet:     wallet,
+		Mnemonic:   wallet.Mnemonic,
+		PrivateKey: key.PrivateKey,
+		PublicKey:  &key.PrivateKey.PublicKey,
+	}
+	return walletDetails, nil
 }
 
 func (ws *WalletService) GetAllWallets() ([]entities.Wallet, error) {
 	return ws.Repo.GetAllWallets()
-}
-
-func (ws *WalletService) LoadWallet(wallet *entities.Wallet, password string) error {
-	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
-	if err != nil {
-		return fmt.Errorf("error reading the wallet file: %v", err)
-	}
-	_, err = keystore.DecryptKey(keyJSON, password)
-	if err != nil {
-		return fmt.Errorf("incorrect password")
-	}
-	return nil
 }
 
 // Helper functions

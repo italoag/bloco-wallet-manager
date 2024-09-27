@@ -1,3 +1,4 @@
+// interfaces/views.go
 package interfaces
 
 import (
@@ -8,6 +9,7 @@ import (
 	"blocowallet/localization"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func (m *CLIModel) View() string {
@@ -110,27 +112,36 @@ func (m *CLIModel) viewWalletPassword() string {
 }
 
 func (m *CLIModel) viewWalletDetails() string {
-	if m.selectedWallet == nil {
-		return localization.Labels["select_wallet_prompt"]
+	if m.walletDetails != nil {
+		// Display wallet details
+		detailStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00FF00")).Align(lipgloss.Left)
+		labelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Align(lipgloss.Left)
+		valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")).Align(lipgloss.Left)
+
+		labelWidth := 20
+
+		var view strings.Builder
+		view.WriteString(detailStyle.Render(localization.Labels["wallet_details_title"] + "\n\n"))
+
+		// Ethereum Address
+		ethLabel := fmt.Sprintf("%-*s", labelWidth, localization.Labels["ethereum_address"])
+		view.WriteString(labelStyle.Render(ethLabel) + valueStyle.Render(fmt.Sprintf(" %s\n", m.walletDetails.Wallet.Address)))
+
+		// Public Key
+		pubLabel := fmt.Sprintf("%-*s", labelWidth, localization.Labels["public_key"])
+		view.WriteString(labelStyle.Render(pubLabel) + valueStyle.Render(fmt.Sprintf(" 0x%x\n", crypto.FromECDSAPub(m.walletDetails.PublicKey))))
+
+		// Private Key
+		privLabel := fmt.Sprintf("%-*s", labelWidth, localization.Labels["private_key"])
+		view.WriteString(labelStyle.Render(privLabel) + valueStyle.Render(fmt.Sprintf(" 0x%x\n", crypto.FromECDSA(m.walletDetails.PrivateKey))))
+
+		// Mnemonic Phrase
+		mnemonicLabel := fmt.Sprintf("%-*s", labelWidth, localization.Labels["mnemonic_phrase_label"])
+		view.WriteString(labelStyle.Render(mnemonicLabel) + valueStyle.Render(fmt.Sprintf(" %s\n", m.walletDetails.Mnemonic)))
+
+		view.WriteString("\n" + localization.Labels["press_esc"])
+		return view.String()
 	}
 
-	// Omit displaying private key and mnemonic for security
-
-	detailStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00FF00")).Align(lipgloss.Left)
-	labelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Align(lipgloss.Left)
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")).Align(lipgloss.Left)
-
-	labelWidth := 20
-
-	var view strings.Builder
-	view.WriteString(detailStyle.Render(localization.Labels["wallet_details_title"] + "\n\n"))
-
-	// Ethereum Address
-	ethLabel := fmt.Sprintf("%-*s", labelWidth, localization.Labels["ethereum_address"])
-	view.WriteString(labelStyle.Render(ethLabel) + valueStyle.Render(fmt.Sprintf(" %s\n", m.selectedWallet.Address)))
-
-	// Additional details can be added here
-
-	view.WriteString("\n" + localization.Labels["press_esc"])
-	return view.String()
+	return localization.Labels["select_wallet_prompt"]
 }

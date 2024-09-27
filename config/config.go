@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	AppDir       string `yaml:"app_dir"`
 	Language     string `yaml:"language"`
 	WalletsDir   string `yaml:"wallets_dir"`
 	DatabasePath string `yaml:"database_path"`
@@ -19,6 +20,7 @@ func LoadConfig(appDir string) (*Config, error) {
 	// If config file doesn't exist, create it with default values
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		defaultConfig := &Config{
+			AppDir:       appDir,
 			Language:     "en",
 			WalletsDir:   filepath.Join(appDir, "keystore"),
 			DatabasePath: filepath.Join(appDir, "wallets.db"),

@@ -13,7 +13,6 @@ var Labels map[string]string
 func SetLanguage(lang string, appDir string) error {
 	labelsPath := filepath.Join(appDir, "locales", fmt.Sprintf("%s.yaml", lang))
 
-	// Se o arquivo de labels não existir, crie arquivos de localização padrão
 	if _, err := os.Stat(labelsPath); os.IsNotExist(err) {
 		err := createDefaultLabels(lang, labelsPath)
 		if err != nil {

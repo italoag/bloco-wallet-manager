@@ -1,3 +1,4 @@
+// interfaces/cli.go
 package interfaces
 
 import (
@@ -44,6 +45,7 @@ type CLIModel struct {
 	walletTable    table.Model
 	width          int
 	height         int
+	walletDetails  *usecases.WalletDetails // Holds wallet details after loading
 }
 
 func NewCLIModel(service *usecases.WalletService) CLIModel {
@@ -126,13 +128,13 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.currentView = "menu"
 					return m, nil
 				}
-				wallet, err := m.Service.CreateWallet(password)
+				walletDetails, err := m.Service.CreateWallet(password)
 				if err != nil {
 					m.err = err
 					m.currentView = "menu"
 					return m, nil
 				}
-				m.selectedWallet = wallet
+				m.walletDetails = walletDetails
 				m.currentView = "wallet_details"
 			} else {
 				var cmd tea.Cmd
@@ -153,7 +155,7 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.importWords[m.importStage] = word
 				m.textInputs[m.importStage].Blur()
 				m.importStage++
-				if m.importStage < 12 {
+				if m.importStage < len(m.textInputs) {
 					m.textInputs[m.importStage].Focus()
 				} else {
 					m.passwordInput = textinput.New()
@@ -182,13 +184,13 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				mnemonic := strings.Join(m.importWords, " ")
-				wallet, err := m.Service.ImportWallet(mnemonic, password)
+				walletDetails, err := m.Service.ImportWallet(mnemonic, password)
 				if err != nil {
 					m.err = err
 					m.currentView = "menu"
 					return m, nil
 				}
-				m.selectedWallet = wallet
+				m.walletDetails = walletDetails
 				m.currentView = "wallet_details"
 			} else {
 				var cmd tea.Cmd
@@ -203,9 +205,9 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "up", "k":
-				m.walletTable.MoveUp(1)
+				m.walletTable.MoveUp(0)
 			case "down", "j":
-				m.walletTable.MoveDown(1)
+				m.walletTable.MoveDown(0)
 			case "enter":
 				selectedRow := m.walletTable.SelectedRow()
 				if len(selectedRow) > 1 {
@@ -232,12 +234,13 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.currentView = "menu"
 					return m, nil
 				}
-				err := m.Service.LoadWallet(m.selectedWallet, password)
+				walletDetails, err := m.Service.LoadWallet(m.selectedWallet, password)
 				if err != nil {
 					m.err = err
 					m.currentView = "menu"
 					return m, nil
 				}
+				m.walletDetails = walletDetails
 				m.currentView = "wallet_details"
 			} else {
 				var cmd tea.Cmd
@@ -249,23 +252,19 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			if msg.String() == "esc" {
+				m.walletDetails = nil // Clear wallet details
 				m.currentView = "list_wallets"
 			}
 		}
 	}
+
 	return m, nil
 }
 
 // Initialization functions
 
 func (m *CLIModel) initCreateWallet() {
-	mnemonic, err := usecases.GenerateMnemonic()
-	if err != nil {
-		m.err = err
-		m.currentView = "menu"
-		return
-	}
-	m.mnemonic = mnemonic
+	m.mnemonic, _ = usecases.GenerateMnemonic() // Generate mnemonic to display
 	m.passwordInput = textinput.New()
 	m.passwordInput.Placeholder = localization.Labels["enter_password"]
 	m.passwordInput.CharLimit = constants.PasswordCharLimit

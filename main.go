@@ -75,9 +75,10 @@ func main() {
 	service := usecases.NewWalletService(repo, ks)
 	model := interfaces.NewCLIModel(service)
 
+	// Start the Bubble Tea program
 	p := tea.NewProgram(&model, tea.WithAltScreen())
-	if err, _ := p.Run(); err != nil {
-		fmt.Println("Error starting the program:", err)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running the program: %v\n", err)
 		os.Exit(1)
 	}
 }
