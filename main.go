@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	WALLETS_DIR = "wallets"
-	DB_NAME     = "wallets.db"
+	WALLETS_DIR = ".wallets/keystore"
+	DB_NAME     = ".wallets/wallets.db"
 	MENU_WIDTH  = 60 // Fixed menu width to prevent excessive space usage
 )
 

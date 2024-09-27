@@ -9,7 +9,11 @@
 *.dylib
 bloco-wallet-manager
 *.DS_Store
-
+.wallets
+.wallets/wallets.db
+.wallets/keystore/
+.idea/
+.idea/*
 # Test binary, built with `go test -c`
 *.test
 
