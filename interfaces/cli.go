@@ -5,12 +5,13 @@ import (
 	"blocowallet/entities"
 	"blocowallet/localization"
 	"blocowallet/usecases"
+	"bytes"
 	"fmt"
+	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/common-nighthawk/go-figure"
 	"github.com/go-errors/errors"
 	"log"
 	"strings"
@@ -86,7 +87,9 @@ func createStyles() Styles {
 
 		Footer: lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Padding(1, 2),
+			PaddingLeft(1).
+			PaddingRight(1).
+			Background(lipgloss.Color("#7D56F4")),
 
 		TopStrip: lipgloss.NewStyle().Margin(1, styleMargin).Padding(0, styleMargin),
 		MenuItem: lipgloss.NewStyle().Width(styleWidth).Margin(0, styleMargin).Padding(0, styleMargin),
@@ -193,7 +196,17 @@ func (m *CLIModel) View() string {
 	}
 
 	// Preparar conteúdo do header
-	logo := figure.NewFigure("bloco", "speed", true).String()
+	//banner := figurine.Write(io.Writer(os.Stdout), "bloco", "Test1.plf")
+	// Preparar conteúdo do header com o logo colorido usando figurine
+	var logoBuffer bytes.Buffer
+	err := figurine.Write(&logoBuffer, "bloco", "Test1.flf")
+	if err != nil {
+		log.Println(errors.Wrap(err, 0))
+		// Fallback para logo sem estilização
+		logoBuffer.WriteString("bloco")
+	}
+	logo := logoBuffer.String()
+	//logo := figure.NewColorFigure("bloco", "speed", "pink", true)
 	walletCount := len(m.wallets)
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 

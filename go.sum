@@ -18,6 +18,10 @@ github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDO
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
 github.com/VictoriaMetrics/fastcache v1.12.2 h1:N0y9ASrJ0F6h0QaC3o6uJb3NIZ9VKLjCM7NQbSmF7WI=
 github.com/VictoriaMetrics/fastcache v1.12.2/go.mod h1:AmC+Nzz1+3G2eCPapF6UcsnkThDcMsQicp4xDukwJYI=
+github.com/arsham/figurine v1.3.0 h1:vpGbzp460B1gkdFt9jrl95v4wDE2vP3BDcg0AKWJ7J0=
+github.com/arsham/figurine v1.3.0/go.mod h1:cnw6B/y/XzRObDhQoqNJnpAGuSSrkjCcqZCcMJ1ag/I=
+github.com/arsham/rainbow v1.2.1 h1:iS8o/1WAPVFvhtMZgdiy7zM8mD+XIWZfwzGXD6manKI=
+github.com/arsham/rainbow v1.2.1/go.mod h1:vERoG76FE/wN9rGJRv9H/tTfH873AX6wfQdJqNRy6fA=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aws/aws-sdk-go-v2 v1.21.2 h1:+LXZ0sgo8quN9UOKXXzAWRT3FWd4NxeXWOZom9pE7GA=
