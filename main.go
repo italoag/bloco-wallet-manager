@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -13,72 +14,95 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/go-errors/errors"
 )
 
 func main() {
-	// Get the user's home directory
+	// Configuração de logging
+	logFile, err := os.OpenFile("blocowallet.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Printf("Erro ao abrir o arquivo de log: %v\n", err)
+		os.Exit(1)
+	}
+	defer func(logFile *os.File) {
+		err := logFile.Close()
+		if err != nil {
+			fmt.Printf("Erro ao fechar o arquivo de log: %v\n", err)
+		}
+	}(logFile)
+	log.SetOutput(logFile)
+
+	// Obter o diretório home do usuário
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Println("Error getting the user's home directory:", err)
+		log.Println(errors.Wrap(err, 0).ErrorStack())
+		fmt.Println("Erro ao obter o diretório home do usuário.")
 		os.Exit(1)
 	}
 
-	// Define the base directory for the application
+	// Definir o diretório base para a aplicação
 	appDir := filepath.Join(homeDir, ".wallets")
 
-	// Ensure the base directory exists
+	// Garantir que o diretório base exista
 	if _, err := os.Stat(appDir); os.IsNotExist(err) {
 		err := os.MkdirAll(appDir, os.ModePerm)
 		if err != nil {
-			fmt.Println("Error creating application directory:", err)
+			log.Println(errors.Wrap(err, 0).ErrorStack())
+			fmt.Println("Erro ao criar o diretório da aplicação.")
 			os.Exit(1)
 		}
 	}
 
-	// Initialize configuration
+	// Inicializar a configuração
 	cfg, err := config.LoadConfig(appDir)
 	if err != nil {
-		fmt.Println("Error loading configuration:", err)
+		log.Println(errors.Wrap(err, 0).ErrorStack())
+		fmt.Println("Erro ao carregar a configuração.")
 		os.Exit(1)
 	}
 
-	// Initialize localization
+	// Inicializar a localização
 	err = localization.SetLanguage(cfg.Language, appDir)
 	if err != nil {
-		fmt.Println("Error loading localization files:", err)
+		log.Println(errors.Wrap(err, 0).ErrorStack())
+		fmt.Println("Erro ao carregar os arquivos de localização.")
 		os.Exit(1)
 	}
 
-	// Ensure the wallets directory exists
+	// Garantir que o diretório de wallets exista
 	if _, err := os.Stat(cfg.WalletsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(cfg.WalletsDir, os.ModePerm)
 		if err != nil {
-			fmt.Println("Error creating wallets directory:", err)
+			log.Println(errors.Wrap(err, 0).ErrorStack())
+			fmt.Println("Erro ao criar o diretório de wallets.")
 			os.Exit(1)
 		}
 	}
 
-	// Initialize the repository
+	// Inicializar o repositório
 	repo, err := infrastructure.NewSQLiteRepository(cfg.DatabasePath)
 	if err != nil {
-		fmt.Println("Error initializing the database:", err)
+		log.Println(errors.Wrap(err, 0).ErrorStack())
+		fmt.Println("Erro ao inicializar o banco de dados.")
 		os.Exit(1)
 	}
 	defer func() {
 		if err := repo.Close(); err != nil {
-			fmt.Println("Error closing the database:", err)
+			log.Println(errors.Wrap(err, 0).ErrorStack())
+			fmt.Println("Erro ao fechar o banco de dados.")
 		}
 	}()
 
-	// Initialize the keystore
+	// Inicializar o keystore
 	ks := keystore.NewKeyStore(cfg.WalletsDir, keystore.StandardScryptN, keystore.StandardScryptP)
 	service := usecases.NewWalletService(repo, ks)
 	model := interfaces.NewCLIModel(service)
 
-	// Start the Bubble Tea program
-	p := tea.NewProgram(&model, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error running the program: %v\n", err)
+	// Iniciar o programa Bubble Tea com tela cheia
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	if err, _ := p.Run(); err != nil {
+		log.Println(errors.Wrap(err, 0).ErrorStack())
+		fmt.Printf("Erro ao executar o programa.\n")
 		os.Exit(1)
 	}
 }

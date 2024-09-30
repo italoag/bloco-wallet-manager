@@ -38,7 +38,7 @@ func createDefaultLabels(lang, labelsPath string) error {
 	switch lang {
 	case "en":
 		defaultLabels = map[string]string{
-			"welcome_message":          "Welcome to the Blocowallet Manager!\n\nSelect an option from the menu.",
+			"welcome_message":          "Welcome to the BLOCO wallet Manager!\n\nSelect an option from the menu.",
 			"mnemonic_phrase":          "Mnemonic Phrase (Keep it Safe!):",
 			"enter_password":           "Enter a password to encrypt the wallet:",
 			"press_enter":              "Press Enter to continue.",
@@ -53,11 +53,11 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"mnemonic_phrase_label":    "Mnemonic Phrase:",
 			"press_esc":                "Press ESC to return to the wallet list.",
 			"main_menu_title":          "Main Menu",
-			"create_new_wallet":        "Create New Wallet",
+			"create_new_wallet":        "Create New",
 			"create_new_wallet_desc":   "Generate a new Ethereum wallet",
-			"import_wallet":            "Import Wallet via Mnemonic",
-			"import_wallet_desc":       "Import an existing wallet using a mnemonic phrase",
-			"list_wallets":             "List All Wallets",
+			"import_wallet":            "Import Mnemonic",
+			"import_wallet_desc":       "Import a wallet using a mnemonic phrase",
+			"list_wallets":             "List Wallets",
 			"list_wallets_desc":        "Display all stored wallets",
 			"exit":                     "Exit",
 			"exit_desc":                "Exit the application",
@@ -68,10 +68,17 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"all_words_required":       "All words must be entered.",
 			"error_loading_wallets":    "Error loading wallets: %v",
 			"password_cannot_be_empty": "The password cannot be empty.",
+			"version":                  "0.1.0",
+			"menu":                     "Menu",
+			"create_wallet_password":   "Create Wallet Password",
+			"import_wallet_password":   "Import Wallet Password",
+			"wallet_password":          "Wallet Password",
+			"wallet_details":           "Wallet Details",
+			"id":                       "ID",
 		}
 	case "pt":
 		defaultLabels = map[string]string{
-			"welcome_message":          "Bem-vindo ao Administrador de Carteiras Blocowallet!\n\nSelecione uma opção do menu.",
+			"welcome_message":          "Bem-vindo ao Administrador de Carteiras BLOCO!\n\nSelecione uma opção do menu.",
 			"mnemonic_phrase":          "Frase Mnemotécnica (Mantenha-a Segura!):",
 			"enter_password":           "Digite uma senha para encriptar a carteira:",
 			"press_enter":              "Pressione Enter para continuar.",
@@ -86,11 +93,11 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"mnemonic_phrase_label":    "Frase Mnemotécnica:",
 			"press_esc":                "Pressione ESC para voltar à lista de carteiras.",
 			"main_menu_title":          "Menu Principal",
-			"create_new_wallet":        "Criar Nova Carteira",
-			"create_new_wallet_desc":   "Gerar uma nova carteira Ethereum",
-			"import_wallet":            "Importar Carteira via Mnemônico",
-			"import_wallet_desc":       "Importar uma carteira existente usando uma frase mnemotécnica",
-			"list_wallets":             "Listar Todas as Carteiras",
+			"create_new_wallet":        "Criar Carteira",
+			"create_new_wallet_desc":   "Criar uma nova carteira Ethereum",
+			"import_wallet":            "Importar via Mnemônico",
+			"import_wallet_desc":       "Importar uma carteira usando uma frase mnemônica",
+			"list_wallets":             "Listar Carteiras",
 			"list_wallets_desc":        "Exibir todas as carteiras armazenadas",
 			"exit":                     "Sair",
 			"exit_desc":                "Sair da aplicação",
@@ -101,10 +108,12 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"all_words_required":       "Todas as palavras devem ser inseridas.",
 			"error_loading_wallets":    "Erro ao carregar as carteiras: %v",
 			"password_cannot_be_empty": "A senha não pode estar vazia.",
+			"version":                  "0.1.0",
+			"id":                       "ID",
 		}
 	case "es":
 		defaultLabels = map[string]string{
-			"welcome_message":          "¡Bienvenido al Administrador de Carteras Blocowallet!\n\nSeleccione una opción del menú.",
+			"welcome_message":          "¡Bienvenido al Administrador de Carteras BLOCO!\n\nSeleccione una opción del menú.",
 			"mnemonic_phrase":          "Frase Mnemotécnica (¡Guárdela de Forma Segura!):",
 			"enter_password":           "Ingrese una contraseña para encriptar la cartera:",
 			"press_enter":              "Presione Enter para continuar.",
@@ -134,6 +143,8 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"all_words_required":       "Todas las palabras deben ser ingresadas.",
 			"error_loading_wallets":    "Error al cargar las carteras: %v",
 			"password_cannot_be_empty": "La contraseña no puede estar vacía.",
+			"version":                  "0.1.0",
+			"id":                       "ID",
 		}
 	default:
 		return fmt.Errorf("unsupported language: %s", lang)

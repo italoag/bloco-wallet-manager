@@ -1,4 +1,3 @@
-// usecases/wallet_service.go
 package usecases
 
 import (
