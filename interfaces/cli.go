@@ -196,8 +196,6 @@ func (m *CLIModel) View() string {
 	}
 
 	// Preparar conteúdo do header
-	//banner := figurine.Write(io.Writer(os.Stdout), "bloco", "Test1.plf")
-	// Preparar conteúdo do header com o logo colorido usando figurine
 	var logoBuffer bytes.Buffer
 	err := figurine.Write(&logoBuffer, "bloco", "Test1.flf")
 	if err != nil {
@@ -206,7 +204,6 @@ func (m *CLIModel) View() string {
 		logoBuffer.WriteString("bloco")
 	}
 	logo := logoBuffer.String()
-	//logo := figure.NewColorFigure("bloco", "speed", "pink", true)
 	walletCount := len(m.wallets)
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 
