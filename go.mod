@@ -7,10 +7,13 @@ require (
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.1
 	github.com/charmbracelet/lipgloss v0.13.0
+	github.com/digitallyserviced/tdfgo v0.0.0-20230424040827-080313390bfd
 	github.com/ethereum/go-ethereum v1.14.10
+	github.com/go-errors/errors v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.23
 	github.com/tyler-smith/go-bip32 v1.0.0
 	github.com/tyler-smith/go-bip39 v1.1.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -34,8 +37,10 @@ require (
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-errors/errors v1.5.1 // indirect
+	github.com/ghostiam/binstruct v1.3.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/gookit/color v1.5.1 // indirect
+	github.com/gookit/goutil v0.5.8 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -47,12 +52,11 @@ require (
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/supranational/blst v0.3.13 // indirect
+	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

@@ -1,9 +1,8 @@
 package infrastructure
 
 import (
+	"blocowallet/domain"
 	"database/sql"
-
-	"blocowallet/entities"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -13,7 +12,7 @@ type SQLiteRepository struct {
 }
 
 // Implement the WalletRepository interface from entities package
-var _ entities.WalletRepository = &SQLiteRepository{}
+var _ domain.WalletRepository = &SQLiteRepository{}
 
 func NewSQLiteRepository(dbPath string) (*SQLiteRepository, error) {
 	conn, err := sql.Open("sqlite3", dbPath)
@@ -37,7 +36,7 @@ func NewSQLiteRepository(dbPath string) (*SQLiteRepository, error) {
 	return &SQLiteRepository{conn: conn}, nil
 }
 
-func (repo *SQLiteRepository) AddWallet(wallet *entities.Wallet) error {
+func (repo *SQLiteRepository) AddWallet(wallet *domain.Wallet) error {
 	insertQuery := `
 	INSERT INTO wallets (address, keystore_path, mnemonic)
 	VALUES (?, ?, ?);
@@ -46,7 +45,7 @@ func (repo *SQLiteRepository) AddWallet(wallet *entities.Wallet) error {
 	return err
 }
 
-func (repo *SQLiteRepository) GetAllWallets() ([]entities.Wallet, error) {
+func (repo *SQLiteRepository) GetAllWallets() ([]domain.Wallet, error) {
 	selectQuery := `
 	SELECT id, address, keystore_path, mnemonic FROM wallets;
 	`
@@ -61,9 +60,9 @@ func (repo *SQLiteRepository) GetAllWallets() ([]entities.Wallet, error) {
 		}
 	}(rows)
 
-	var wallets []entities.Wallet
+	var wallets []domain.Wallet
 	for rows.Next() {
-		var w entities.Wallet
+		var w domain.Wallet
 		err := rows.Scan(&w.ID, &w.Address, &w.KeyStorePath, &w.Mnemonic)
 		if err != nil {
 			return nil, err

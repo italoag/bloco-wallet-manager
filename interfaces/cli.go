@@ -2,115 +2,132 @@ package interfaces
 
 import (
 	"blocowallet/constants"
-	"blocowallet/entities"
 	"blocowallet/localization"
 	"blocowallet/usecases"
-	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/digitallyserviced/tdfgo/tdf"
 	"github.com/go-errors/errors"
 	"log"
+	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-type CLIModel struct {
-	Service        *usecases.WalletService
-	currentView    string
-	menuItems      []menuItem
-	selectedMenu   int
-	importWords    []string
-	importStage    int
-	textInputs     []textinput.Model
-	wallets        []entities.Wallet
-	selectedWallet *entities.Wallet
-	err            error
-	passwordInput  textinput.Model
-	mnemonic       string
-	walletTable    table.Model // Alterado para valor, não ponteiro
-	width          int
-	height         int
-	walletDetails  *usecases.WalletDetails
-	styles         Styles
-}
-
-const (
-	defaultView              = "menu"
-	createWalletView         = "create_wallet_password"
-	importWalletView         = "import_wallet"
-	importWalletPasswordView = "import_wallet_password"
-	listWalletsView          = "list_wallets"
-	walletPasswordView       = "wallet_password"
-	walletDetailsView        = "wallet_details"
-	styleWidth               = 40
-	styleMargin              = 1
-)
-
-type Styles struct {
-	Header        lipgloss.Style
-	Content       lipgloss.Style
-	Footer        lipgloss.Style
-	TopStrip      lipgloss.Style
-	MenuItem      lipgloss.Style
-	MenuSelected  lipgloss.Style
-	SelectedTitle lipgloss.Style
-	MenuTitle     lipgloss.Style
-	MenuDesc      lipgloss.Style
-	ErrorStyle    lipgloss.Style
-	WalletDetails lipgloss.Style
-	StatusBar     lipgloss.Style
-}
+type splashMsg struct{}
 
 func NewCLIModel(service *usecases.WalletService) *CLIModel {
-	return &CLIModel{
+	model := &CLIModel{
 		Service:      service,
-		currentView:  defaultView,
+		currentView:  constants.SplashView, // Inicia com a splash screen
 		menuItems:    NewMenu(),
 		selectedMenu: 0,
 		styles:       createStyles(),
 	}
+
+	if err := initializeFont(model); err != nil {
+		model.err = err
+		return model
+	}
+
+	return model
 }
 
-func createStyles() Styles {
-	return Styles{
-		Header: lipgloss.NewStyle().
-			Align(lipgloss.Left).
-			Padding(1, 2),
-
-		Content: lipgloss.NewStyle().
-			Align(lipgloss.Left).
-			Padding(1, 2),
-
-		Footer: lipgloss.NewStyle().
-			Align(lipgloss.Left).
-			PaddingLeft(1).
-			PaddingRight(1).
-			Background(lipgloss.Color("#7D56F4")),
-
-		TopStrip: lipgloss.NewStyle().Margin(1, styleMargin).Padding(0, styleMargin),
-		MenuItem: lipgloss.NewStyle().Width(styleWidth).Margin(0, styleMargin).Padding(0, styleMargin),
-		MenuSelected: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("99")).
-			Bold(true).
-			Margin(0, styleMargin).
-			Padding(0, styleMargin).
-			Border(lipgloss.NormalBorder(), false, false, false, true).
-			Width(styleWidth),
-		SelectedTitle: lipgloss.NewStyle().Bold(true).Margin(0, styleMargin).Padding(0, styleMargin).Foreground(lipgloss.Color("99")),
-		MenuTitle:     lipgloss.NewStyle().Margin(0, styleMargin).Padding(0, styleMargin).Bold(true),
-		MenuDesc:      lipgloss.NewStyle().Margin(0, styleMargin).Padding(0, styleMargin).Width(styleWidth).Foreground(lipgloss.Color("244")),
-		ErrorStyle:    lipgloss.NewStyle().Padding(1, 2).Margin(1, styleMargin),
-		WalletDetails: lipgloss.NewStyle().Margin(1, styleMargin).Padding(1, 2),
-		StatusBar:     lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, styleMargin),
+func initializeFont(model *CLIModel) error {
+	// Carregar a lista de fontes do arquivo JSON
+	fonts, err := loadFontsList(constants.ConfigFontsPath)
+	if err != nil {
+		log.Println("Erro ao carregar a lista de fontes:", err)
+		return err
 	}
+
+	if len(fonts) == 0 {
+		log.Println("A lista de fontes está vazia.")
+		return errors.New("a lista de fontes está vazia")
+	}
+
+	// Selecionar uma fonte aleatoriamente
+	selectedFontName, err := selectRandomFont(fonts)
+	if err != nil {
+		log.Println("Erro ao selecionar uma fonte aleatoriamente:", err)
+		return err
+	}
+
+	log.Printf("Fonte selecionada aleatoriamente: %s\n", selectedFontName)
+
+	// Encontrar a fonte utilizando o módulo tdfgo
+	fontInfo := tdf.FindFont(selectedFontName)
+	if fontInfo == nil {
+		log.Printf("Fonte '%s' não encontrada nos diretórios especificados.\n", selectedFontName)
+		return errors.New(constants.ErrorFontNotFoundMessage)
+	}
+
+	// Carregar a fonte selecionada
+	fontFile, err := tdf.LoadFont(fontInfo)
+	if err != nil {
+		log.Println("Erro ao carregar a fonte:", err)
+		return errors.Wrap(err, 0)
+	}
+
+	if len(fontFile.Fonts) == 0 {
+		log.Printf("Nenhuma fonte carregada de '%s.tdf'\n", selectedFontName)
+		return errors.New("nenhuma fonte carregada")
+	}
+
+	// Armazenar a informação da fonte selecionada no modelo
+	model.selectedFont = &fontFile.Fonts[0]
+	model.fontInfo = fontInfo
+
+	return nil
+}
+
+type FontsConfig struct {
+	Fonts []string `json:"fonts"`
+}
+
+func loadFontsList(configPath string) ([]string, error) {
+	absPath, err := filepath.Abs(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao obter caminho absoluto do config: %v", err)
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao ler o arquivo de configuração das fontes: %v", err)
+	}
+
+	var config FontsConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("erro ao deserializar o JSON de fontes: %v", err)
+	}
+
+	return config.Fonts, nil
+}
+
+func selectRandomFont(fonts []string) (string, error) {
+	if len(fonts) == 0 {
+		return "", fmt.Errorf("lista de fontes está vazia")
+	}
+
+	rand.NewSource(time.Now().UnixNano())
+	index := rand.Intn(len(fonts))
+	return fonts[index], nil
 }
 
 func (m *CLIModel) Init() tea.Cmd {
-	return nil
+	return splashCmd()
+}
+
+func splashCmd() tea.Cmd {
+	return tea.Tick(constants.SplashDuration, func(t time.Time) tea.Msg {
+		return splashMsg{}
+	})
 }
 
 func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -128,37 +145,45 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.styles.Footer = m.styles.Footer.Width(m.width)
 
 		// Atualizar dimensões da tabela
-		if m.currentView == listWalletsView {
+		if m.currentView == constants.ListWalletsView {
 			m.updateTableDimensions()
 		}
+		return m, nil
+
+	case splashMsg:
+		// Transitar para o menu principal após a splash screen
+		m.currentView = constants.DefaultView
 		return m, nil
 	}
 
 	if m.err != nil {
 		if _, ok := msg.(tea.KeyMsg); ok {
 			m.err = nil
-			m.currentView = defaultView
+			m.currentView = constants.DefaultView
 		}
 		return m, nil
 	}
 
 	switch m.currentView {
-	case defaultView:
+	case constants.SplashView:
+		// Nenhuma atualização adicional necessária durante a splash screen
+		return m, nil
+	case constants.DefaultView:
 		return m.updateMenu(msg)
-	case createWalletView:
+	case constants.CreateWalletView:
 		return m.updateCreateWalletPassword(msg)
-	case importWalletView:
+	case constants.ImportWalletView:
 		return m.updateImportWallet(msg)
-	case importWalletPasswordView:
+	case constants.ImportWalletPasswordView:
 		return m.updateImportWalletPassword(msg)
-	case listWalletsView:
+	case constants.ListWalletsView:
 		return m.updateListWallets(msg)
-	case walletPasswordView:
+	case constants.WalletPasswordView:
 		return m.updateWalletPassword(msg)
-	case walletDetailsView:
+	case constants.WalletDetailsView:
 		return m.updateWalletDetails(msg)
 	default:
-		m.currentView = defaultView
+		m.currentView = constants.DefaultView
 		return m, nil
 	}
 }
@@ -195,93 +220,29 @@ func (m *CLIModel) View() string {
 		return m.styles.ErrorStyle.Render(fmt.Sprintf(localization.Labels["error_message"], m.err))
 	}
 
-	// Preparar conteúdo do header
-	var logoBuffer bytes.Buffer
-	err := figurine.Write(&logoBuffer, "bloco", "Test1.flf")
-	if err != nil {
-		log.Println(errors.Wrap(err, 0))
-		// Fallback para logo sem estilização
-		logoBuffer.WriteString("bloco")
+	switch m.currentView {
+	case constants.SplashView:
+		return m.renderSplash()
+	default:
+		return m.renderMainView()
 	}
-	logo := logoBuffer.String()
-	walletCount := len(m.wallets)
-	currentTime := time.Now().Format("2006-01-02 15:04:05")
-
-	headerLeft := lipgloss.JoinVertical(
-		lipgloss.Left,
-		logo,
-		fmt.Sprintf("Wallets: %d", walletCount),
-		fmt.Sprintf("Date: %s", currentTime),
-		fmt.Sprintf("Version: %s", localization.Labels["version"]),
-	)
-
-	menuItems := m.renderMenuItems()
-	menuGrid := lipgloss.JoinVertical(lipgloss.Left, menuItems...)
-
-	// Montar header
-	headerContent := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		headerLeft,
-		lipgloss.NewStyle().Width(m.width-lipgloss.Width(headerLeft)-lipgloss.Width(menuGrid)).Render(""),
-		menuGrid,
-	)
-
-	// Renderizar header com altura fixa
-	renderedHeader := m.styles.Header.Render(headerContent)
-	headerHeight := lipgloss.Height(renderedHeader)
-
-	// Preparar conteúdo do footer
-	statusBar := fmt.Sprintf("Current view: %s | Wallets: %d", localization.Labels[m.currentView], walletCount)
-	renderedFooter := m.styles.Footer.Render(statusBar)
-	footerHeight := lipgloss.Height(renderedFooter)
-
-	// Calcular altura da área de conteúdo
-	contentHeight := m.height - headerHeight - footerHeight - 2 // Subtrai 2 para evitar overflow
-
-	if contentHeight < 0 {
-		contentHeight = 0
-	}
-
-	// Obter a visualização do conteúdo
-	content := m.getContentView()
-
-	// Renderizar conteúdo com altura ajustada
-	renderedContent := m.styles.Content.Height(contentHeight).Render(content)
-
-	// Inserir espaço vazio para empurrar o footer para baixo
-	remainingHeight := m.height - headerHeight - lipgloss.Height(renderedContent) - footerHeight
-	if remainingHeight < 0 {
-		remainingHeight = 0
-	}
-	emptySpace := lipgloss.NewStyle().Height(remainingHeight).Render("")
-
-	// Montar a visualização final
-	finalView := lipgloss.JoinVertical(
-		lipgloss.Top,
-		renderedHeader,
-		renderedContent,
-		emptySpace,
-		renderedFooter,
-	)
-
-	return finalView
 }
 
 func (m *CLIModel) getContentView() string {
 	switch m.currentView {
-	case defaultView:
+	case constants.DefaultView:
 		return localization.Labels["welcome_message"]
-	case createWalletView:
+	case constants.CreateWalletView:
 		return m.viewCreateWalletPassword()
-	case importWalletView:
+	case constants.ImportWalletView:
 		return m.viewImportWallet()
-	case importWalletPasswordView:
+	case constants.ImportWalletPasswordView:
 		return m.viewImportWalletPassword()
-	case listWalletsView:
+	case constants.ListWalletsView:
 		return m.viewListWallets()
-	case walletPasswordView:
+	case constants.WalletPasswordView:
 		return m.viewWalletPassword()
-	case walletDetailsView:
+	case constants.WalletDetailsView:
 		return m.viewWalletDetails()
 	default:
 		return localization.Labels["unknown_state"]
@@ -333,18 +294,18 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			if len(password) < constants.PasswordMinLength {
 				m.err = errors.Wrap(fmt.Errorf(localization.Labels["password_too_short"]), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			walletDetails, err := m.Service.CreateWallet(password)
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			m.walletDetails = walletDetails
-			m.currentView = walletDetailsView
+			m.currentView = constants.WalletDetailsView
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
@@ -378,10 +339,10 @@ func (m *CLIModel) updateImportWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.passwordInput.EchoMode = textinput.EchoPassword
 				m.passwordInput.EchoCharacter = '•'
 				m.passwordInput.Focus()
-				m.currentView = importWalletPasswordView
+				m.currentView = constants.ImportWalletPasswordView
 			}
 		case "esc":
-			m.currentView = defaultView
+			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
 			m.textInputs[m.importStage], cmd = m.textInputs[m.importStage].Update(msg)
@@ -400,7 +361,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			if len(password) < constants.PasswordMinLength {
 				m.err = errors.Wrap(fmt.Errorf(localization.Labels["password_too_short"]), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			mnemonic := strings.Join(m.importWords, " ")
@@ -408,13 +369,13 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			m.walletDetails = walletDetails
-			m.currentView = walletDetailsView
+			m.currentView = constants.WalletDetailsView
 		case "esc":
-			m.currentView = defaultView
+			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
@@ -442,7 +403,7 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "esc":
-			m.currentView = defaultView
+			m.currentView = constants.DefaultView
 			return m, nil
 		}
 	}
@@ -462,20 +423,20 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if password == "" {
 				m.err = errors.Wrap(fmt.Errorf(localization.Labels["password_cannot_be_empty"]), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			walletDetails, err := m.Service.LoadWallet(m.selectedWallet, password)
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = defaultView
+				m.currentView = constants.DefaultView
 				return m, nil
 			}
 			m.walletDetails = walletDetails
-			m.currentView = walletDetailsView
+			m.currentView = constants.WalletDetailsView
 		case "esc":
-			m.currentView = defaultView
+			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
@@ -491,14 +452,14 @@ func (m *CLIModel) updateWalletDetails(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			m.walletDetails = nil
-			m.currentView = listWalletsView
+			m.currentView = constants.ListWalletsView
 		}
 	}
 	return m, nil
 }
 
 func (m *CLIModel) updateTableDimensions() {
-	if m.currentView != listWalletsView || len(m.wallets) == 0 {
+	if m.currentView != constants.ListWalletsView || len(m.wallets) == 0 {
 		return
 	}
 
@@ -536,7 +497,7 @@ func (m *CLIModel) initCreateWallet() {
 	m.passwordInput.EchoMode = textinput.EchoPassword
 	m.passwordInput.EchoCharacter = '•'
 	m.passwordInput.Focus()
-	m.currentView = createWalletView
+	m.currentView = constants.CreateWalletView
 }
 
 func (m *CLIModel) initImportWallet() {
@@ -551,7 +512,7 @@ func (m *CLIModel) initImportWallet() {
 		m.textInputs[i] = ti
 	}
 	m.textInputs[0].Focus()
-	m.currentView = importWalletView
+	m.currentView = constants.ImportWalletView
 }
 
 func (m *CLIModel) initListWallets() {
@@ -559,7 +520,7 @@ func (m *CLIModel) initListWallets() {
 	if err != nil {
 		m.err = errors.Wrap(fmt.Errorf(localization.Labels["error_loading_wallets"], err), 0)
 		log.Println(m.err.(*errors.Error).ErrorStack())
-		m.currentView = defaultView
+		m.currentView = constants.DefaultView
 		return
 	}
 	m.wallets = wallets
@@ -605,7 +566,7 @@ func (m *CLIModel) initListWallets() {
 	// Atualizar dimensões da tabela
 	m.updateTableDimensions()
 
-	m.currentView = listWalletsView
+	m.currentView = constants.ListWalletsView
 }
 
 func (m *CLIModel) initWalletPassword() {
@@ -616,5 +577,5 @@ func (m *CLIModel) initWalletPassword() {
 	m.passwordInput.EchoMode = textinput.EchoPassword
 	m.passwordInput.EchoCharacter = '•'
 	m.passwordInput.Focus()
-	m.currentView = walletPasswordView
+	m.currentView = constants.WalletPasswordView
 }
