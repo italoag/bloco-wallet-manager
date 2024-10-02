@@ -25,7 +25,7 @@ type splashMsg struct{}
 func NewCLIModel(service *usecases.WalletService) *CLIModel {
 	model := &CLIModel{
 		Service:      service,
-		currentView:  constants.SplashView, // Inicia com a splash screen
+		currentView:  constants.SplashView,
 		menuItems:    NewMenu(),
 		selectedMenu: 0,
 		styles:       createStyles(),
@@ -123,7 +123,7 @@ func selectRandomFont(fonts []string) (string, error) {
 func (m *CLIModel) Init() tea.Cmd {
 	return tea.Batch(
 		splashCmd(),
-		walletCountCmd(m.Service), // Assumindo que m.Service implementa walletFetcher
+		walletCountCmd(m.Service),
 	)
 }
 
@@ -289,9 +289,11 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initImportWallet()
 			case localization.Labels["list_wallets"]:
 				m.initListWallets()
-			case localization.Labels["exit"]:
+			case tea.KeyCtrlX.String(), "q", localization.Labels["exit"]:
 				return m, tea.Quit
 			}
+		case tea.KeyCtrlX.String(), "q":
+			return m, tea.Quit
 		}
 	}
 	return m, nil
@@ -318,6 +320,8 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
+		case "esc":
+			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
