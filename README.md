@@ -41,22 +41,22 @@
 Ensure you have [Go](https://golang.org/doc/install) installed on your system.
 
 ```bash
-git clone https://github.com/italoag/go-wallet-manager.git
-cd go-wallet-manager
-go build -o blocowm
+git clone https://github.com/italoag/bloco-wallet-manager.git
+cd bloco-wallet-manager
+go build -o bwm
 ```
 
 Move the executable to a directory in your PATH for easy access:
 
 ```bash
-mv blocowm /usr/local/bin/
+mv bwm /usr/local/bin/
 ```
 
 ## Usage
 Run the BLOCO Wallet Manager using the terminal:
 
 ```bash
-blocowm
+bwm
 ```
 
 Navigate through the TUI to manage your wallets. Available commands include:
