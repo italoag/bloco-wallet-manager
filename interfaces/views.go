@@ -75,13 +75,15 @@ func (m *CLIModel) renderSplash() string {
 
 func (m *CLIModel) renderStatusBar() string {
 	// Left part: Number of wallets
-	left := m.styles.StatusBarLeft.Copy().
+	leftStyle := m.styles.StatusBarLeft // Used assignment for copying.
+	left := leftStyle.
 		SetString(fmt.Sprintf("Wallets: %d", m.walletCount)).
 		String()
 
 	// Right part: Current date and time
 	currentTime := time.Now().Format("02-01-2006 15:04:05")
-	right := m.styles.StatusBarRight.Copy().
+	rightStyle := m.styles.StatusBarRight // Used assignment for copying.
+	right := rightStyle.
 		SetString(fmt.Sprintf("Date: %s", currentTime)).
 		String()
 
@@ -89,8 +91,8 @@ func (m *CLIModel) renderStatusBar() string {
 	centerContent := fmt.Sprintf("View: %s | Press 'q' to quit", localization.Labels[m.currentView])
 
 	centerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
-
-	center := m.styles.StatusBarCenter.Copy().
+	centerStyle := m.styles.StatusBarCenter // Used assignment for copying.
+	center := centerStyle.
 		SetString(centerContent).
 		Width(centerWidth).
 		Align(lipgloss.Center).
