@@ -121,7 +121,10 @@ func selectRandomFont(fonts []string) (string, error) {
 }
 
 func (m *CLIModel) Init() tea.Cmd {
-	return splashCmd()
+	return tea.Batch(
+		splashCmd(),
+		walletCountCmd(m.Service), // Assumindo que m.Service implementa walletFetcher
+	)
 }
 
 func splashCmd() tea.Cmd {
@@ -153,6 +156,15 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case splashMsg:
 		// Transitar para o menu principal após a splash screen
 		m.currentView = constants.DefaultView
+		// Iniciar o comando para buscar a quantidade de wallets
+		return m, walletCountCmd(m.Service)
+	case walletCountMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			log.Println("Erro ao buscar a quantidade de wallets:", msg.err)
+		} else {
+			m.walletCount = msg.count
+		}
 		return m, nil
 	}
 

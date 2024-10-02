@@ -17,6 +17,7 @@ type CLIModel struct {
 	importStage    int
 	textInputs     []textinput.Model
 	wallets        []domain.Wallet
+	walletCount    int
 	selectedWallet *domain.Wallet
 	err            error
 	passwordInput  textinput.Model

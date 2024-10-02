@@ -76,7 +76,7 @@ func (m *CLIModel) renderSplash() string {
 func (m *CLIModel) renderStatusBar() string {
 	// Left part: Number of wallets
 	left := m.styles.StatusBarLeft.Copy().
-		SetString(fmt.Sprintf("Wallets: %d", len(m.wallets))).
+		SetString(fmt.Sprintf("Wallets: %d", m.walletCount)).
 		String()
 
 	// Right part: Current date and time
@@ -116,7 +116,7 @@ func (m *CLIModel) renderMainView() string {
 	}
 	renderedLogo := logoBuffer.String()
 
-	walletCount := len(m.wallets)
+	walletCount := m.walletCount
 	currentTime := time.Now().Format("02-01-2006 15:04:05")
 
 	headerLeft := lipgloss.JoinVertical(
