@@ -5,14 +5,15 @@ import (
 	"blocowallet/localization"
 	"bytes"
 	"fmt"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/digitallyserviced/tdfgo/tdf"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/go-errors/errors"
-	"log"
-	"strings"
-	"time"
 )
 
 // viewCreateWalletPassword renderiza a visualização de criação de wallet
@@ -241,6 +242,16 @@ func (m *CLIModel) viewWalletPassword() string {
 	return view.String()
 }
 
+// renderiza as operações possíveis com o registro da wallet
+func (m *CLIModel) viewSelectWalletOperation() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	// render two options
+	return m.operationTable.View()
+}
+
 // viewWalletDetails renderiza a visualização de detalhes da wallet
 func (m *CLIModel) viewWalletDetails() string {
 	if localization.Labels == nil {
@@ -260,4 +271,12 @@ func (m *CLIModel) viewWalletDetails() string {
 		return view.String()
 	}
 	return localization.Labels["select_wallet_prompt"]
+}
+
+func (m *CLIModel) viewDeleteWallet() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	return m.walletTable.View()
 }

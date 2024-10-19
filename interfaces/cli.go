@@ -6,18 +6,19 @@ import (
 	"blocowallet/usecases"
 	"encoding/json"
 	"fmt"
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/digitallyserviced/tdfgo/tdf"
-	"github.com/go-errors/errors"
 	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/digitallyserviced/tdfgo/tdf"
+	"github.com/go-errors/errors"
 )
 
 type splashMsg struct{}
@@ -174,12 +175,16 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateCreateWalletPassword(msg)
 	case constants.ImportWalletView:
 		return m.updateImportWallet(msg)
+	case constants.DeleteWalletView:
+		return m.updateDeleteWallet(msg)
 	case constants.ImportWalletPasswordView:
 		return m.updateImportWalletPassword(msg)
 	case constants.ListWalletsView:
 		return m.updateListWallets(msg)
 	case constants.WalletPasswordView:
 		return m.updateWalletPassword(msg)
+	case constants.SelectWalletOperationView:
+		return m.updateSelectWalletOperation(msg)
 	case constants.WalletDetailsView:
 		return m.updateWalletDetails(msg)
 	default:
@@ -242,6 +247,8 @@ func (m *CLIModel) getContentView() string {
 		return m.viewListWallets()
 	case constants.WalletPasswordView:
 		return m.viewWalletPassword()
+	case constants.SelectWalletOperationView:
+		return m.viewSelectWalletOperation()
 	case constants.WalletDetailsView:
 		return m.viewWalletDetails()
 	default:
@@ -277,6 +284,8 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initImportWallet()
 			case localization.Labels["list_wallets"]:
 				m.initListWallets()
+			case localization.Labels["delete_wallet"]:
+				m.initDeleteWallet()
 			case localization.Labels["exit"]:
 				return m, tea.Quit
 			}
@@ -312,6 +321,31 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			return m, cmd
 		}
 	}
+	return m, nil
+}
+
+func (m *CLIModel) updateDeleteWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			selectedRow := m.walletTable.SelectedRow()
+			if len(selectedRow) > 1 {
+				address := selectedRow[1]
+				// Buscar wallet pela address
+				for _, w := range m.wallets {
+					if w.Address == address {
+						m.selectedWallet = &w
+						m.initWalletPassword()
+						return m, nil
+					}
+				}
+			}
+		case "esc":
+			m.currentView = constants.DefaultView
+		}
+	}
+
 	return m, nil
 }
 
@@ -385,6 +419,27 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
+func (m *CLIModel) updateSelectWalletOperation(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			selectedRow := m.operationTable.Cursor()
+			if selectedRow == 0 {
+				m.currentView = constants.WalletDetailsView
+			}
+		case "esc":
+			m.currentView = constants.DefaultView
+			return m, nil
+		}
+
+	}
+
+	var cmd tea.Cmd
+	m.operationTable, cmd = m.operationTable.Update(msg)
+	return m, cmd
+}
+
 func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -426,6 +481,7 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
+
 			walletDetails, err := m.Service.LoadWallet(m.selectedWallet, password)
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
@@ -434,7 +490,8 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.walletDetails = walletDetails
-			m.currentView = constants.WalletDetailsView
+
+			m.initSelectWalletOperation()
 		case "esc":
 			m.currentView = constants.DefaultView
 		default:
@@ -515,6 +572,11 @@ func (m *CLIModel) initImportWallet() {
 	m.currentView = constants.ImportWalletView
 }
 
+func (m *CLIModel) initDeleteWallet() {
+	m.initListWallets()
+	m.currentView = constants.DeleteWalletView
+}
+
 func (m *CLIModel) initListWallets() {
 	wallets, err := m.Service.GetAllWallets()
 	if err != nil {
@@ -567,6 +629,23 @@ func (m *CLIModel) initListWallets() {
 	m.updateTableDimensions()
 
 	m.currentView = constants.ListWalletsView
+}
+
+func (m *CLIModel) initSelectWalletOperation() {
+	// TODO: improve table appearence
+	// TODO: get from localization
+	columns := []table.Column{
+		{Title: "Operation", Width: 20},
+	}
+	rows := []table.Row{{"Wallet details"}, {"Delete wallet"}}
+
+	m.operationTable = table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+	)
+
+	m.currentView = constants.SelectWalletOperationView
 }
 
 func (m *CLIModel) initWalletPassword() {

@@ -59,6 +59,8 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"import_wallet_desc":       "Import a wallet using a mnemonic phrase",
 			"list_wallets":             "List Wallets",
 			"list_wallets_desc":        "Display all stored wallets",
+			"delete_wallet":            "Delete wallet",
+			"delete_wallet_desc":       "Delete an existent wallet from database",
 			"exit":                     "Exit",
 			"exit_desc":                "Exit the application",
 			"error_message":            "Error: %v\n\nPress any key to return to the main menu.",
@@ -75,6 +77,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"wallet_password":          "Wallet Password",
 			"wallet_details":           "Wallet Details",
 			"id":                       "ID",
+			"operation":                "Operation",
+			"wallet_details_option":    "Wallet details",
+			"wallet_delete_option":     "Delete wallet",
 		}
 	case "pt":
 		defaultLabels = map[string]string{
@@ -99,6 +104,8 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"import_wallet_desc":       "Importar uma carteira usando uma frase mnemônica",
 			"list_wallets":             "Listar Carteiras",
 			"list_wallets_desc":        "Exibir todas as carteiras armazenadas",
+			"delete_wallet":            "Deletar Carteira",
+			"delete_wallet_desc":       "Deleta uma carteira existente da base de dados",
 			"exit":                     "Sair",
 			"exit_desc":                "Sair da aplicação",
 			"error_message":            "Erro: %v\n\nPressione qualquer tecla para voltar ao menu principal.",
@@ -110,6 +117,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"password_cannot_be_empty": "A senha não pode estar vazia.",
 			"version":                  "0.1.0",
 			"id":                       "ID",
+			"operation":                "Operação",
+			"wallet_details_option":    "Detalhes da carteira",
+			"wallet_delete_option":     "Excluir carteira",
 		}
 	case "es":
 		defaultLabels = map[string]string{
@@ -134,6 +144,8 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"import_wallet_desc":       "Importar una cartera existente usando una frase mnemotécnica",
 			"list_wallets":             "Listar Todas las Carteras",
 			"list_wallets_desc":        "Mostrar todas las carteras almacenadas",
+			"delete_wallet":            "Borrar Cartera",
+			"delete_wallet_desc":       "Eliminar una cartera existente de la base de datos",
 			"exit":                     "Salir",
 			"exit_desc":                "Salir de la aplicación",
 			"error_message":            "Error: %v\n\nPresione cualquier tecla para volver al menú principal.",
@@ -145,6 +157,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"password_cannot_be_empty": "La contraseña no puede estar vacía.",
 			"version":                  "0.1.0",
 			"id":                       "ID",
+			"operation":                "Operaciones",
+			"wallet_details_option":    "Detalles de la cartera",
+			"wallet_delete_option":     "Eliminar carteira",
 		}
 	default:
 		return fmt.Errorf("unsupported language: %s", lang)

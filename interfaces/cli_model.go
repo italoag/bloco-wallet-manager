@@ -22,6 +22,7 @@ type CLIModel struct {
 	passwordInput  textinput.Model
 	mnemonic       string
 	walletTable    table.Model
+	operationTable table.Model
 	width          int
 	height         int
 	walletDetails  *usecases.WalletDetails
