@@ -278,5 +278,15 @@ func (m *CLIModel) viewDeleteWallet() string {
 		return "Localization labels not initialized."
 	}
 
-	return m.walletTable.View()
+	var view strings.Builder
+	// TODO: Improve style
+	// TODO: Use labels
+	view.WriteString(
+		lipgloss.NewStyle().Bold(true).Render("Are you sure you want to delete your wallet? This action is irreversible!"+"\n\n") +
+			"Type 'DELETE' to confirm\n\n" +
+			m.deleteConfirmationInput.View() + "\n\n" +
+			localization.Labels["press_esc"],
+			
+	)
+	return view.String()
 }

@@ -175,8 +175,6 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateCreateWalletPassword(msg)
 	case constants.ImportWalletView:
 		return m.updateImportWallet(msg)
-	case constants.DeleteWalletView:
-		return m.updateDeleteWallet(msg)
 	case constants.ImportWalletPasswordView:
 		return m.updateImportWalletPassword(msg)
 	case constants.ListWalletsView:
@@ -187,6 +185,8 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSelectWalletOperation(msg)
 	case constants.WalletDetailsView:
 		return m.updateWalletDetails(msg)
+	case constants.DeleteWalletConfirmationView:
+		return m.updateDeleteWalletConfirmation(msg)
 	default:
 		m.currentView = constants.DefaultView
 		return m, nil
@@ -249,6 +249,8 @@ func (m *CLIModel) getContentView() string {
 		return m.viewWalletPassword()
 	case constants.SelectWalletOperationView:
 		return m.viewSelectWalletOperation()
+	case constants.DeleteWalletConfirmationView:
+		return m.viewDeleteWallet()
 	case constants.WalletDetailsView:
 		return m.viewWalletDetails()
 	default:
@@ -284,8 +286,6 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initImportWallet()
 			case localization.Labels["list_wallets"]:
 				m.initListWallets()
-			case localization.Labels["delete_wallet"]:
-				m.initDeleteWallet()
 			case localization.Labels["exit"]:
 				return m, tea.Quit
 			}
@@ -324,25 +324,30 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-func (m *CLIModel) updateDeleteWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *CLIModel) updateDeleteWalletConfirmation(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			selectedRow := m.walletTable.SelectedRow()
-			if len(selectedRow) > 1 {
-				address := selectedRow[1]
-				// Buscar wallet pela address
-				for _, w := range m.wallets {
-					if w.Address == address {
-						m.selectedWallet = &w
-						m.initWalletPassword()
-						return m, nil
-					}
+			deleteConfirmation := strings.TrimSpace(m.deleteConfirmationInput.Value())
+			if strings.ToUpper(deleteConfirmation) == "DELETE" {
+				err := m.Service.DeleteWallet(m.selectedWallet.ID)
+
+				// TODO: Turn this into label
+				if err != nil {
+					m.err = errors.Wrap(fmt.Errorf("It wasnt possible to delete the wallet", err), 0)
 				}
+
+				m.currentView = constants.DefaultView
 			}
+
 		case "esc":
 			m.currentView = constants.DefaultView
+
+		default:
+			var cmd tea.Cmd
+			m.deleteConfirmationInput, cmd = m.deleteConfirmationInput.Update(msg)
+			return m, cmd
 		}
 	}
 
@@ -427,6 +432,8 @@ func (m *CLIModel) updateSelectWalletOperation(msg tea.Msg) (tea.Model, tea.Cmd)
 			selectedRow := m.operationTable.Cursor()
 			if selectedRow == 0 {
 				m.currentView = constants.WalletDetailsView
+			} else if selectedRow == 1 {
+				m.initDeleteWalletConfirmation()
 			}
 		case "esc":
 			m.currentView = constants.DefaultView
@@ -572,9 +579,12 @@ func (m *CLIModel) initImportWallet() {
 	m.currentView = constants.ImportWalletView
 }
 
-func (m *CLIModel) initDeleteWallet() {
-	m.initListWallets()
-	m.currentView = constants.DeleteWalletView
+func (m *CLIModel) initDeleteWalletConfirmation() {
+	m.deleteConfirmationInput = textinput.New()
+	m.deleteConfirmationInput.Focus()
+	m.deleteConfirmationInput.CharLimit = len("DELETE")
+
+	m.currentView = constants.DeleteWalletConfirmationView
 }
 
 func (m *CLIModel) initListWallets() {

@@ -13,7 +13,7 @@ const (
 	ImportWalletPasswordView  = "import_wallet_password"
 	SelectWalletOperationView = "wallet_select_operation_view"
 	ListWalletsView           = "list_wallets"
-	DeleteWalletView          = "delete_wallet"
+	DeleteWalletConfirmationView = "delete_wallet_confirmation"
 	WalletPasswordView        = "wallet_password"
 	WalletDetailsView         = "wallet_details"
 	StyleWidth                = 40
