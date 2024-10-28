@@ -280,13 +280,11 @@ func (m *CLIModel) viewDeleteWallet() string {
 
 	var view strings.Builder
 	// TODO: Improve style
-	// TODO: Use labels
 	view.WriteString(
-		lipgloss.NewStyle().Bold(true).Render("Are you sure you want to delete your wallet? This action is irreversible!"+"\n\n") +
-			"Type 'DELETE' to confirm\n\n" +
+		lipgloss.NewStyle().Bold(true).Render(localization.Labels["delete_confirmation_message"]+"\n\n") +
+			localization.Labels["type_delete"] + "\n\n" +
 			m.deleteConfirmationInput.View() + "\n\n" +
 			localization.Labels["press_esc"],
-			
 	)
 	return view.String()
 }

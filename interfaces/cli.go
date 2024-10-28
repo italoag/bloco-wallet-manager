@@ -333,9 +333,8 @@ func (m *CLIModel) updateDeleteWalletConfirmation(msg tea.Msg) (tea.Model, tea.C
 			if strings.ToUpper(deleteConfirmation) == "DELETE" {
 				err := m.Service.DeleteWallet(m.selectedWallet.ID)
 
-				// TODO: Turn this into label
 				if err != nil {
-					m.err = errors.Wrap(fmt.Errorf("It wasnt possible to delete the wallet", err), 0)
+					m.err = errors.Wrap(err, 0)
 				}
 
 				m.currentView = constants.DefaultView
@@ -642,12 +641,11 @@ func (m *CLIModel) initListWallets() {
 }
 
 func (m *CLIModel) initSelectWalletOperation() {
-	// TODO: improve table appearence
-	// TODO: get from localization
+	// TODO: improve style
 	columns := []table.Column{
-		{Title: "Operation", Width: 20},
+		{Title: localization.Labels["operation"], Width: 20},
 	}
-	rows := []table.Row{{"Wallet details"}, {"Delete wallet"}}
+	rows := []table.Row{{localization.Labels["wallet_details_option"]}, {localization.Labels["wallet_delete_option"]}}
 
 	m.operationTable = table.New(
 		table.WithColumns(columns),
