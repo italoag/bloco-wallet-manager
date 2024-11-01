@@ -641,9 +641,8 @@ func (m *CLIModel) initListWallets() {
 }
 
 func (m *CLIModel) initSelectWalletOperation() {
-	// TODO: improve style
 	columns := []table.Column{
-		{Title: localization.Labels["operation"], Width: 20},
+		{Title: localization.Labels["operation"], Width: 30},
 	}
 	rows := []table.Row{{localization.Labels["wallet_details_option"]}, {localization.Labels["wallet_delete_option"]}}
 
@@ -652,6 +651,20 @@ func (m *CLIModel) initSelectWalletOperation() {
 		table.WithRows(rows),
 		table.WithFocused(true),
 	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(true)
+
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+
+	m.operationTable.SetStyles(s)
 
 	m.currentView = constants.SelectWalletOperationView
 }

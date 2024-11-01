@@ -261,7 +261,7 @@ func (m *CLIModel) viewWalletDetails() string {
 	if m.walletDetails != nil {
 		var view strings.Builder
 		view.WriteString(
-			lipgloss.NewStyle().Bold(true).Render(localization.Labels["wallet_details_title"]+"\n\n") +
+			lipgloss.NewStyle().Bold(true).Render(localization.Labels["wallet_details_title"]) + "\n\n" +
 				fmt.Sprintf("%-*s %s\n", 20, localization.Labels["ethereum_address"], m.walletDetails.Wallet.Address) +
 				fmt.Sprintf("%-*s 0x%x\n", 20, localization.Labels["private_key"], crypto.FromECDSA(m.walletDetails.PrivateKey)) +
 				fmt.Sprintf("%-*s %x\n", 20, localization.Labels["public_key"], crypto.FromECDSAPub(m.walletDetails.PublicKey)) +
@@ -279,9 +279,9 @@ func (m *CLIModel) viewDeleteWallet() string {
 	}
 
 	var view strings.Builder
-	// TODO: Improve style
+
 	view.WriteString(
-		lipgloss.NewStyle().Bold(true).Render(localization.Labels["delete_confirmation_message"]+"\n\n") +
+		lipgloss.NewStyle().Bold(true).Render(localization.Labels["delete_confirmation_message"]) + "\n\n" +
 			localization.Labels["type_delete"] + "\n\n" +
 			m.deleteConfirmationInput.View() + "\n\n" +
 			localization.Labels["press_esc"],
