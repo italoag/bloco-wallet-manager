@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"blocowallet/constants"
+	"blocowallet/internal/constants"
 	"github.com/charmbracelet/lipgloss"
 )
 

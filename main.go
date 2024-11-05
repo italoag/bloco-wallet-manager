@@ -1,17 +1,16 @@
 package main
 
 import (
+	"blocowallet/internal/infrastructure/database"
+	"blocowallet/internal/interfaces"
+	"blocowallet/internal/usecases"
+	"blocowallet/pkg/config"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
-	"blocowallet/config"
-	"blocowallet/infrastructure"
-	"blocowallet/interfaces"
 	"blocowallet/localization"
-	"blocowallet/usecases"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/go-errors/errors"
@@ -69,7 +68,7 @@ func main() {
 	}
 
 	// Inicializar o repositório
-	repo, err := infrastructure.NewSQLiteRepository(cfg.DatabasePath)
+	repo, err := database.NewSQLiteRepository(cfg.DatabasePath)
 	if err != nil {
 		handleError("Erro ao inicializar o banco de dados", err)
 	}
@@ -103,7 +102,7 @@ func closeFile(file *os.File) {
 	}
 }
 
-func closeResource(repo *infrastructure.SQLiteRepository) {
+func closeResource(repo *database.SQLiteRepository) {
 	if err := repo.Close(); err != nil {
 		log.Printf("Erro ao fechar o banco de dados: %v\n", err)
 	}

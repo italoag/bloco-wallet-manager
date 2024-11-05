@@ -12,6 +12,8 @@ type Config struct {
 	Language     string `yaml:"language"`
 	WalletsDir   string `yaml:"wallets_dir"`
 	DatabasePath string `yaml:"database_path"`
+	DatabaseURL  string
+	LogLevel     string
 }
 
 func LoadConfig(appDir string) (*Config, error) {
@@ -24,6 +26,8 @@ func LoadConfig(appDir string) (*Config, error) {
 			Language:     "en",
 			WalletsDir:   filepath.Join(appDir, "keystore"),
 			DatabasePath: filepath.Join(appDir, "wallets.db"),
+			DatabaseURL:  "postgres://user:pass@localhost/db",
+			LogLevel:     "info",
 		}
 
 		configData, err := yaml.Marshal(defaultConfig)

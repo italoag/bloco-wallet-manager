@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"blocowallet/constants"
+	"blocowallet/internal/constants"
 	"blocowallet/localization"
 	"bytes"
 	"fmt"
@@ -145,9 +145,6 @@ func (m *CLIModel) renderMainView() string {
 	headerHeight := lipgloss.Height(renderedHeader)
 
 	// Preparar conteúdo do footer
-	//statusBar := fmt.Sprintf("Current view: %s | Wallets: %d", localization.Labels[m.currentView], walletCount)
-	//renderedFooter := m.styles.Footer.Render(statusBar)
-	//footerHeight := lipgloss.Height(renderedFooter)
 	renderedFooter := m.renderStatusBar()
 	footerHeight := lipgloss.Height(renderedFooter)
 

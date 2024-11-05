@@ -1,8 +1,8 @@
 package interfaces
 
 import (
-	"blocowallet/domain"
-	"blocowallet/usecases"
+	"blocowallet/internal/domain/entities"
+	"blocowallet/internal/usecases"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/digitallyserviced/tdfgo/tdf"
@@ -16,9 +16,9 @@ type CLIModel struct {
 	importWords    []string
 	importStage    int
 	textInputs     []textinput.Model
-	wallets        []domain.Wallet
+	wallets        []entities.Wallet
 	walletCount    int
-	selectedWallet *domain.Wallet
+	selectedWallet *entities.Wallet
 	err            error
 	passwordInput  textinput.Model
 	mnemonic       string

@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"blocowallet/usecases"
+	"blocowallet/internal/usecases"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

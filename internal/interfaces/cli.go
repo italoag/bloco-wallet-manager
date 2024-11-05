@@ -1,9 +1,9 @@
 package interfaces
 
 import (
-	"blocowallet/constants"
+	"blocowallet/internal/constants"
+	"blocowallet/internal/usecases"
 	"blocowallet/localization"
-	"blocowallet/usecases"
 	"encoding/json"
 	"fmt"
 	"github.com/charmbracelet/bubbles/table"

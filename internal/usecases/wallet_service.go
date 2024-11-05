@@ -1,13 +1,13 @@
 package usecases
 
 import (
+	domain2 "blocowallet/internal/domain/entities"
+	"blocowallet/internal/domain/gateway"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"blocowallet/domain"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,18 +16,18 @@ import (
 )
 
 type WalletDetails struct {
-	Wallet     *domain.Wallet
+	Wallet     *domain2.Wallet
 	Mnemonic   string
 	PrivateKey *ecdsa.PrivateKey
 	PublicKey  *ecdsa.PublicKey
 }
 
 type WalletService struct {
-	Repo     domain.WalletRepository
+	Repo     gateway.WalletRepository
 	KeyStore *keystore.KeyStore
 }
 
-func NewWalletService(repo domain.WalletRepository, ks *keystore.KeyStore) *WalletService {
+func NewWalletService(repo gateway.WalletRepository, ks *keystore.KeyStore) *WalletService {
 	return &WalletService{
 		Repo:     repo,
 		KeyStore: ks,
@@ -63,13 +63,13 @@ func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
-	wallet := &domain.Wallet{
+	wallet := &domain2.Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
 	}
 
-	err = ws.Repo.AddWallet(wallet)
+	err = ws.Repo.CreateWallet(wallet)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +112,13 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
-	wallet := &domain.Wallet{
+	wallet := &domain2.Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
 	}
 
-	err = ws.Repo.AddWallet(wallet)
+	err = ws.Repo.CreateWallet(wallet)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 	return walletDetails, nil
 }
 
-func (ws *WalletService) LoadWallet(wallet *domain.Wallet, password string) (*WalletDetails, error) {
+func (ws *WalletService) Hi(wallet *domain2.Wallet, password string) (*WalletDetails, error) {
 	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading the wallet file: %v", err)
@@ -152,8 +152,8 @@ func (ws *WalletService) LoadWallet(wallet *domain.Wallet, password string) (*Wa
 	return walletDetails, nil
 }
 
-func (ws *WalletService) GetAllWallets() ([]domain.Wallet, error) {
-	return ws.Repo.GetAllWallets()
+func (ws *WalletService) GetAllWallets() ([]domain2.Wallet, error) {
+	return ws.Repo.ListWallets()
 }
 
 // Helper functions
