@@ -156,6 +156,10 @@ func (ws *WalletService) GetAllWallets() ([]domain.Wallet, error) {
 	return ws.Repo.GetAllWallets()
 }
 
+func (ws *WalletService) DeleteWallet(id int) error {
+	return ws.Repo.DeleteWallet(id)
+}
+
 // Helper functions
 
 func GenerateMnemonic() (string, error) {

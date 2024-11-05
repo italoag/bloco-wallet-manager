@@ -20,8 +20,10 @@ type CLIModel struct {
 	selectedWallet *domain.Wallet
 	err            error
 	passwordInput  textinput.Model
+	deleteConfirmationInput textinput.Model
 	mnemonic       string
 	walletTable    table.Model
+	operationTable table.Model
 	width          int
 	height         int
 	walletDetails  *usecases.WalletDetails
