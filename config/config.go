@@ -56,7 +56,7 @@ func LoadConfig(appDir string) (*Config, error) {
 		return nil, err
 	}
 
-	// Expand ~ to home directory
+	// Expand ~ to the home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err

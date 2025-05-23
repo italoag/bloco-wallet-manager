@@ -880,7 +880,7 @@ func (m *CLIModel) updateTableDimensions() {
 	}
 
 	m.walletTable.SetWidth(m.width - 4)
-	m.walletTable.SetHeight(contentAreaHeight - 2) // Subtrai 2 para evitar overflow
+	m.walletTable.SetHeight(contentAreaHeight) // Usando a altura total disponível para mostrar mais wallets
 
 	// Calcular larguras das colunas
 	idColWidth := 10
