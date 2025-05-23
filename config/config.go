@@ -17,7 +17,7 @@ type Config struct {
 func LoadConfig(appDir string) (*Config, error) {
 	configPath := filepath.Join(appDir, "config.yaml")
 
-	// If config file doesn't exist, create it with default values
+	// If a config file doesn't exist, create it with default values
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		defaultConfig := &Config{
 			AppDir:       appDir,

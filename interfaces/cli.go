@@ -354,6 +354,11 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case walletsRefreshedMsg:
+		// Apenas retornar o modelo sem fazer nada, pois a atualização já foi feita
+		// Isso evita que a tela inteira seja redesenhada
+		return m, nil
+
 	case splashMsg:
 		// Transitar para o menu principal após a splash screen
 		m.currentView = constants.DefaultView
@@ -577,7 +582,12 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
+
+			// Atualizar a contagem de wallets
+			return m, m.refreshWalletsTable()
 		case "esc", "backspace":
+			// Reset the password input field
+			m.passwordInput = textinput.New()
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -661,6 +671,9 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
+
+			// Atualizar a contagem de wallets
+			return m, m.refreshWalletsTable()
 		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
@@ -1033,6 +1046,9 @@ func (m *CLIModel) initWalletPassword() {
 	m.currentView = constants.WalletPasswordView
 }
 
+// walletsRefreshedMsg é uma mensagem personalizada para indicar que a lista de wallets foi atualizada
+type walletsRefreshedMsg struct{}
+
 func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 	return func() tea.Msg {
 		// Recarregar a lista de wallets do serviço
@@ -1045,6 +1061,9 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 		// Atualizar a lista de wallets no modelo
 		m.wallets = wallets
 
+		// Atualizar a contagem de wallets
+		m.walletCount = len(wallets)
+
 		// Reconstruir as linhas da tabela
 		var rows []table.Row
 		for _, w := range m.wallets {
@@ -1054,8 +1073,8 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 		// Atualizar a tabela com as novas linhas
 		m.walletTable.SetRows(rows)
 
-		// Retornar uma mensagem vazia para indicar conclusão
-		return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+		// Retornar uma mensagem personalizada para indicar que a lista foi atualizada
+		return walletsRefreshedMsg{}
 	}
 }
 
