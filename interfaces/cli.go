@@ -20,6 +20,85 @@ import (
 	"time"
 )
 
+// Lista de diretórios onde procurar fontes
+var fontsDirs []string
+
+// Adiciona um diretório à lista de diretórios onde procurar fontes
+func addFontDir(dir string) {
+	// Verificar se o diretório já existe na lista
+	for _, d := range fontsDirs {
+		if d == dir {
+			return
+		}
+	}
+	fontsDirs = append(fontsDirs, dir)
+}
+
+// Modificando a função FindFonts para procurar nos diretórios registrados
+func findFontInDirs(fontName string) *tdf.FontInfo {
+	// Primeiro, tentamos usar a função original FindFont
+	fontInfo := tdf.FindFont(fontName)
+	if fontInfo != nil {
+		return fontInfo
+	}
+
+	// Se não encontrado, procuramos manualmente nos diretórios registrados
+	for _, dir := range fontsDirs {
+		if dir == "BUILTIN" {
+			continue // Pular diretórios especiais
+		}
+
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+
+		for _, file := range files {
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".tdf") {
+				// Verificar se o nome da fonte corresponde
+				baseName := strings.TrimSuffix(file.Name(), ".tdf")
+				if strings.EqualFold(baseName, fontName) {
+					return tdf.NewFontInfo(file.Name(), filepath.Join(dir, file.Name()))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
+func buildFontsList(customFontDir string) []*tdf.FontInfo {
+	var fonts []*tdf.FontInfo
+
+	// Primeiro, tenta adicionar fontes do diretório personalizado, se existir
+	if customFontDir != "" {
+		if _, err := os.Stat(customFontDir); err == nil {
+			// Adicionar fontes do diretório personalizado
+			files, err := os.ReadDir(customFontDir)
+			if err == nil {
+				for _, file := range files {
+					if !file.IsDir() && strings.HasSuffix(strings.ToLower(file.Name()), ".tdf") {
+						fontPath := filepath.Join(customFontDir, file.Name())
+						fontInfo := tdf.NewFontInfo(file.Name(), fontPath)
+						fontInfo.FontDir = customFontDir
+						fonts = append(fonts, fontInfo)
+					}
+				}
+			}
+		}
+	}
+
+	// Se nenhuma fonte foi encontrada no diretório personalizado ou se ele não existe,
+	// usar as fontes embutidas
+	if len(fonts) == 0 {
+		builtinFonts := tdf.SearchBuiltinFonts("*")
+		fonts = append(fonts, builtinFonts...)
+	}
+
+	return fonts
+}
+
 type splashMsg struct{}
 
 func NewCLIModel(service *usecases.WalletService) *CLIModel {
@@ -40,34 +119,91 @@ func NewCLIModel(service *usecases.WalletService) *CLIModel {
 }
 
 func initializeFont(model *CLIModel) error {
-	// Carregar a lista de fontes do arquivo JSON
-	fonts, err := loadFontsList(constants.ConfigFontsPath)
+	// Obter o diretório home do usuário
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Println("Erro ao carregar a lista de fontes:", err)
-		return err
+		return errors.Wrap(err, 0)
 	}
 
-	if len(fonts) == 0 {
-		log.Println("A lista de fontes está vazia.")
-		return errors.New("a lista de fontes está vazia")
+	// Definir o diretório da aplicação
+	appDir := filepath.Join(homeDir, ".wallets")
+
+	// Definir o diretório de fontes personalizado
+	customFontDir := filepath.Join(appDir, "config", "fonts")
+
+	// Verificar se o diretório de fontes personalizado existe
+	if _, err := os.Stat(customFontDir); err != nil {
+		// Se não existir, tentar criar o diretório
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(customFontDir, os.ModePerm)
+			if err != nil {
+				log.Printf("Não foi possível criar o diretório de fontes personalizado: %v\n", err)
+				// Continuar com as fontes embutidas
+				customFontDir = ""
+			}
+		} else {
+			log.Printf("Erro ao verificar o diretório de fontes personalizado: %v\n", err)
+			customFontDir = ""
+		}
 	}
 
-	// Selecionar uma fonte aleatoriamente
-	selectedFontName, err := selectRandomFont(fonts)
+	// Construir a lista de fontes disponíveis (personalizadas + embutidas)
+	availableFonts := buildFontsList(customFontDir)
+
+	if len(availableFonts) == 0 {
+		return errors.New("nenhuma fonte disponível, nem personalizada nem embutida")
+	}
+
+	// Carregar nomes das fontes configuradas
+	configuredFontNames, err := loadFontsList(appDir)
+	if err != nil {
+		log.Println("Erro ao carregar a lista de fontes configuradas:", err)
+		// Se houver erro, escolher qualquer fonte disponível
+		rand.NewSource(time.Now().UnixNano())
+		selectedFontInfo := availableFonts[rand.Intn(len(availableFonts))]
+		return loadSelectedFont(model, selectedFontInfo)
+	}
+
+	// Se não houver fontes configuradas, escolher qualquer fonte disponível
+	if len(configuredFontNames) == 0 {
+		log.Println("A lista de fontes configuradas está vazia, selecionando aleatoriamente.")
+		rand.NewSource(time.Now().UnixNano())
+		selectedFontInfo := availableFonts[rand.Intn(len(availableFonts))]
+		return loadSelectedFont(model, selectedFontInfo)
+	}
+
+	// Selecionar uma fonte da lista configurada
+	selectedName, err := selectRandomFont(configuredFontNames)
 	if err != nil {
 		log.Println("Erro ao selecionar uma fonte aleatoriamente:", err)
-		return err
+		// Selecionar qualquer fonte disponível como fallback
+		rand.NewSource(time.Now().UnixNano())
+		selectedFontInfo := availableFonts[rand.Intn(len(availableFonts))]
+		return loadSelectedFont(model, selectedFontInfo)
 	}
 
-	log.Printf("Fonte selecionada aleatoriamente: %s\n", selectedFontName)
-
-	// Encontrar a fonte utilizando o módulo tdfgo
-	fontInfo := tdf.FindFont(selectedFontName)
-	if fontInfo == nil {
-		log.Printf("Fonte '%s' não encontrada nos diretórios especificados.\n", selectedFontName)
-		return errors.New(constants.ErrorFontNotFoundMessage)
+	// Procurar a fonte selecionada nas fontes disponíveis
+	var selectedFontInfo *tdf.FontInfo
+	for _, fontInfo := range availableFonts {
+		baseName := strings.TrimSuffix(fontInfo.File, ".tdf")
+		if strings.EqualFold(baseName, selectedName) {
+			selectedFontInfo = fontInfo
+			break
+		}
 	}
 
+	// Se não encontrada, usar qualquer fonte disponível como fallback
+	if selectedFontInfo == nil {
+		log.Printf("Fonte '%s' não encontrada. Usando uma fonte aleatória como fallback.\n", selectedName)
+		rand.NewSource(time.Now().UnixNano())
+		selectedFontInfo = availableFonts[rand.Intn(len(availableFonts))]
+	}
+
+	return loadSelectedFont(model, selectedFontInfo)
+}
+
+// Função auxiliar para carregar a fonte selecionada
+func loadSelectedFont(model *CLIModel, fontInfo *tdf.FontInfo) error {
 	// Carregar a fonte selecionada
 	fontFile, err := tdf.LoadFont(fontInfo)
 	if err != nil {
@@ -76,7 +212,7 @@ func initializeFont(model *CLIModel) error {
 	}
 
 	if len(fontFile.Fonts) == 0 {
-		log.Printf("Nenhuma fonte carregada de '%s.tdf'\n", selectedFontName)
+		log.Printf("Nenhuma fonte carregada de '%s'\n", fontInfo.File)
 		return errors.New("nenhuma fonte carregada")
 	}
 
@@ -84,6 +220,7 @@ func initializeFont(model *CLIModel) error {
 	model.selectedFont = &fontFile.Fonts[0]
 	model.fontInfo = fontInfo
 
+	log.Printf("Fonte carregada com sucesso: %s\n", fontInfo.File)
 	return nil
 }
 
@@ -91,13 +228,51 @@ type FontsConfig struct {
 	Fonts []string `json:"fonts"`
 }
 
-func loadFontsList(configPath string) ([]string, error) {
-	absPath, err := filepath.Abs(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("erro ao obter caminho absoluto do config: %v", err)
+func loadFontsList(appDir string) ([]string, error) {
+	// Construir o caminho correto para o arquivo de configuração
+	configPath := filepath.Join(appDir, "config", "fonts.json")
+
+	// Verificar se o diretório config existe, se não, criar
+	configDir := filepath.Dir(configPath)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		err := os.MkdirAll(configDir, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("erro ao criar o diretório de configuração: %v", err)
+		}
 	}
 
-	data, err := os.ReadFile(absPath)
+	// Verificar se o arquivo de configuração existe, se não, criar com valores padrão
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Tentar ler do caminho relativo (para o caso de desenvolvimento)
+		relativeConfigPath := filepath.Join("config", "fonts.json")
+		data, err := os.ReadFile(relativeConfigPath)
+		if err == nil {
+			// Escrever para o caminho correto
+			err = os.WriteFile(configPath, data, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("erro ao criar o arquivo de configuração das fontes: %v", err)
+			}
+		} else {
+			// Se não conseguir ler do relativo, criar um config padrão
+			defaultFonts := FontsConfig{
+				Fonts: []string{
+					"1911", "dynasty", "etherx", "commx", "intensex",
+					"icex", "royfour", "phudge", "portal", "wild",
+				},
+			}
+			data, err := json.Marshal(defaultFonts)
+			if err != nil {
+				return nil, fmt.Errorf("erro ao criar configuração padrão: %v", err)
+			}
+			err = os.WriteFile(configPath, data, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("erro ao criar o arquivo de configuração das fontes: %v", err)
+			}
+		}
+	}
+
+	// Agora ler o arquivo
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao ler o arquivo de configuração das fontes: %v", err)
 	}
@@ -138,6 +313,32 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Tratar as teclas de navegação global (b/backspace) antes de qualquer outro processamento
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "b", "backspace":
+			if m.currentView != constants.DefaultView && m.currentView != constants.SplashView {
+				// Para a maioria das telas, voltar para o menu principal
+				if m.currentView == constants.WalletDetailsView {
+					// Comportamento específico para tela de detalhes: voltar para lista de wallets
+					m.walletDetails = nil
+					m.currentView = constants.ListWalletsView
+				} else {
+					// Comportamento padrão: voltar ao menu principal
+					m.menuItems = NewMenu()
+					m.selectedMenu = 0
+					m.currentView = constants.DefaultView
+				}
+				// Sempre retorne imediatamente após processar a tecla de navegação
+				return m, nil
+			}
+		case "q":
+			if m.currentView != constants.SplashView {
+				return m, tea.Quit
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -176,6 +377,7 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Processamento específico para cada tela
 	switch m.currentView {
 	case constants.SplashView:
 		// Nenhuma atualização adicional necessária durante a splash screen
@@ -184,8 +386,12 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMenu(msg)
 	case constants.CreateWalletView:
 		return m.updateCreateWalletPassword(msg)
+	case constants.ImportMethodSelectionView:
+		return m.updateImportMethodSelection(msg)
 	case constants.ImportWalletView:
 		return m.updateImportWallet(msg)
+	case constants.ImportPrivateKeyView:
+		return m.updateImportPrivateKey(msg)
 	case constants.ImportWalletPasswordView:
 		return m.updateImportWalletPassword(msg)
 	case constants.ListWalletsView:
@@ -227,6 +433,48 @@ func (m *CLIModel) renderMenuItems() []string {
 	return menuRows
 }
 
+// renderImportMenuItems renderiza os itens do menu de importação
+func (m *CLIModel) renderImportMenuItems() string {
+	// Criar o menu de importação
+	importMenu := NewImportMenu()
+
+	// Renderizar cada item do menu
+	var menuItems []string
+	for i, item := range importMenu {
+		style := m.styles.MenuItem
+		titleStyle := m.styles.MenuTitle
+		if i == m.selectedMenu {
+			style = m.styles.MenuSelected
+			titleStyle = m.styles.SelectedTitle
+		}
+		menuText := fmt.Sprintf("%s\n%s", titleStyle.Render(item.title), m.styles.MenuDesc.Render(item.description))
+		menuItems = append(menuItems, style.Render(menuText))
+	}
+
+	// Organizar itens em linhas
+	numRows := (len(menuItems) + 1) / 2
+	var menuRows []string
+	for i := 0; i < numRows; i++ {
+		startIndex := i * 2
+		endIndex := startIndex + 2
+		if endIndex > len(menuItems) {
+			endIndex = len(menuItems)
+		}
+
+		// Se temos dois itens na linha
+		if endIndex-startIndex == 2 {
+			// Unir horizontalmente com espaçamento
+			menuRows = append(menuRows, lipgloss.JoinHorizontal(lipgloss.Top, menuItems[startIndex], "  ", menuItems[startIndex+1]))
+		} else {
+			// Apenas um item na linha
+			menuRows = append(menuRows, menuItems[startIndex])
+		}
+	}
+
+	// Unir todas as linhas verticalmente
+	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
+}
+
 func (m *CLIModel) View() string {
 	if m.err != nil {
 		return m.styles.ErrorStyle.Render(fmt.Sprintf(localization.Labels["error_message"], m.err))
@@ -246,8 +494,12 @@ func (m *CLIModel) getContentView() string {
 		return localization.Labels["welcome_message"]
 	case constants.CreateWalletView:
 		return m.viewCreateWalletPassword()
+	case constants.ImportMethodSelectionView:
+		return m.viewImportMethodSelection()
 	case constants.ImportWalletView:
 		return m.viewImportWallet()
+	case constants.ImportPrivateKeyView:
+		return m.viewImportPrivateKey()
 	case constants.ImportWalletPasswordView:
 		return m.viewImportWalletPassword()
 	case constants.ListWalletsView:
@@ -294,6 +546,11 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case tea.KeyCtrlX.String(), "q":
 			return m, tea.Quit
+		case "b", "backspace": // Substituindo "esc" por "b" e "backspace"
+			// Voltar para o menu principal
+			m.menuItems = NewMenu() // Recarregar o menu principal
+			m.selectedMenu = 0      // Resetar a seleção
+			m.currentView = constants.DefaultView
 		}
 	}
 	return m, nil
@@ -320,7 +577,7 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "esc":
+		case "b", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -357,7 +614,7 @@ func (m *CLIModel) updateImportWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.passwordInput.Focus()
 				m.currentView = constants.ImportWalletPasswordView
 			}
-		case "esc":
+		case "b", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -380,21 +637,123 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
-			mnemonic := strings.Join(m.importWords, " ")
-			walletDetails, err := m.Service.ImportWallet(mnemonic, password)
+
+			var walletDetails *usecases.WalletDetails
+			var err error
+
+			// Check if we're coming from private key import or mnemonic import
+			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
+				// Import from private key
+				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
+				walletDetails, err = m.Service.ImportWalletFromPrivateKey(privateKey, password)
+			} else {
+				// Import from mnemonic
+				mnemonic := strings.Join(m.importWords, " ")
+				walletDetails, err = m.Service.ImportWallet(mnemonic, password)
+			}
+
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
+
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "esc":
+		case "b", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
+func (m *CLIModel) updateImportMethodSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Criar o menu de importação
+	importMenu := NewImportMenu()
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.selectedMenu > 0 {
+				m.selectedMenu--
+			}
+		case "down", "j":
+			if m.selectedMenu < len(importMenu)-1 {
+				m.selectedMenu++
+			}
+		case "enter":
+			// Usar o menu de importação para determinar a ação baseada na seleção
+			switch m.selectedMenu {
+			case 0: // Primeira opção: Importar por frase mnemônica
+				// Preparar campos de entrada para as 12 palavras
+				m.textInputs = make([]textinput.Model, constants.MnemonicWordCount)
+				m.importWords = make([]string, constants.MnemonicWordCount)
+				for i := 0; i < constants.MnemonicWordCount; i++ {
+					ti := textinput.New()
+					ti.Placeholder = fmt.Sprintf("%s %d", localization.Labels["word"], i+1)
+					ti.CharLimit = 50
+					ti.Width = 30
+					if i == 0 {
+						ti.Focus()
+					}
+					m.textInputs[i] = ti
+				}
+				m.importStage = 0
+				m.currentView = constants.ImportWalletView
+
+			case 1: // Segunda opção: Importar por chave privada
+				m.privateKeyInput = textinput.New()
+				m.privateKeyInput.Placeholder = localization.Labels["enter_private_key"]
+				m.privateKeyInput.CharLimit = 66 // 0x + 64 caracteres hexadecimais
+				m.privateKeyInput.Width = 66
+				m.privateKeyInput.Focus()
+				m.currentView = constants.ImportPrivateKeyView
+
+			case 2: // Terceira opção: Voltar ao menu principal
+				m.currentView = constants.DefaultView
+				m.selectedMenu = 0
+			}
+		case "b", "backspace":
+			m.currentView = constants.DefaultView
+			m.selectedMenu = 0
+		}
+	}
+	return m, nil
+}
+
+func (m *CLIModel) updateImportPrivateKey(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			privateKey := strings.TrimSpace(m.privateKeyInput.Value())
+			if privateKey == "" {
+				m.err = errors.Wrap(fmt.Errorf(localization.Labels["invalid_private_key"]), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Move to password input screen
+			m.passwordInput = textinput.New()
+			m.passwordInput.Placeholder = localization.Labels["enter_password"]
+			m.passwordInput.CharLimit = constants.PasswordCharLimit
+			m.passwordInput.Width = constants.PasswordWidth
+			m.passwordInput.EchoMode = textinput.EchoPassword
+			m.passwordInput.EchoCharacter = '•'
+			m.passwordInput.Focus()
+			m.currentView = constants.ImportWalletPasswordView
+
+		case "b", "backspace":
+			m.currentView = constants.DefaultView
+		default:
+			var cmd tea.Cmd
+			m.privateKeyInput, cmd = m.privateKeyInput.Update(msg)
 			return m, cmd
 		}
 	}
@@ -418,7 +777,7 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "esc":
+		case "b", "backspace":
 			m.currentView = constants.DefaultView
 			return m, nil
 		}
@@ -451,7 +810,7 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "esc":
+		case "b", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -466,9 +825,10 @@ func (m *CLIModel) updateWalletDetails(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "b", "backspace":
 			m.walletDetails = nil
 			m.currentView = constants.ListWalletsView
+			return m, nil // Return explícito para consumir o evento de teclado
 		}
 	}
 	return m, nil
@@ -516,19 +876,27 @@ func (m *CLIModel) initCreateWallet() {
 	m.currentView = constants.CreateWalletView
 }
 
+func (m *CLIModel) initImportMethodSelection() {
+	// Usar o menu de importação que inclui a opção de voltar ao menu principal
+	m.menuItems = NewImportMenu()
+	m.selectedMenu = 0
+	m.currentView = constants.ImportMethodSelectionView
+}
+
+func (m *CLIModel) initImportPrivateKey() {
+	// Setup private key input
+	m.privateKeyInput = textinput.New()
+	m.privateKeyInput.Placeholder = localization.Labels["enter_private_key"]
+	m.privateKeyInput.CharLimit = 66 // 0x + 64 hex characters
+	m.privateKeyInput.Width = 66
+	m.privateKeyInput.Focus()
+	m.currentView = constants.ImportPrivateKeyView
+}
+
 func (m *CLIModel) initImportWallet() {
-	m.importWords = make([]string, 12)
-	m.importStage = 0
-	m.textInputs = make([]textinput.Model, 12)
-	for i := 0; i < 12; i++ {
-		ti := textinput.New()
-		ti.Placeholder = fmt.Sprintf("%s %d", localization.Labels["word"], i+1)
-		ti.CharLimit = 32
-		ti.Width = 20
-		m.textInputs[i] = ti
-	}
-	m.textInputs[0].Focus()
-	m.currentView = constants.ImportWalletView
+	// Instead of directly initializing the mnemonic import view,
+	// now we show the selection screen first
+	m.initImportMethodSelection()
 }
 
 func (m *CLIModel) initListWallets() {

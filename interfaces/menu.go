@@ -34,3 +34,12 @@ func NewMenu() []menuItem {
 		{title: localization.Labels["exit"], description: localization.Labels["exit_desc"]},
 	}
 }
+
+// NewImportMenu cria e retorna uma lista de itens do menu de importação
+func NewImportMenu() []menuItem {
+	return []menuItem{
+		{title: localization.Labels["import_mnemonic"], description: localization.Labels["import_mnemonic_desc"]},
+		{title: localization.Labels["import_private_key"], description: localization.Labels["import_private_key_desc"]},
+		{title: localization.Labels["back_to_menu"], description: localization.Labels["back_to_menu_desc"]},
+	}
+}

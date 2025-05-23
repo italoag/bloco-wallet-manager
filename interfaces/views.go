@@ -88,7 +88,7 @@ func (m *CLIModel) renderStatusBar() string {
 		String()
 
 	// Center part: Current view and shortcut keys
-	centerContent := fmt.Sprintf("View: %s | Press 'q' to quit", localization.Labels[m.currentView])
+	centerContent := fmt.Sprintf("View: %s | Press 'b' or backspace to return | Press 'q' to quit", localization.Labels[m.currentView])
 
 	centerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	centerStyle := m.styles.StatusBarCenter // Used assignment for copying.
@@ -190,18 +190,54 @@ func (m *CLIModel) viewImportWallet() string {
 	}
 
 	var view strings.Builder
-	view.WriteString(
-		lipgloss.NewStyle().Bold(true).Render(localization.Labels["import_wallet_title"] + "\n\n"),
-	)
+
+	// Renderizando o título com destaque
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#7D56F4")).
+		MarginBottom(1).
+		Render(localization.Labels["import_wallet_title"])
+
+	view.WriteString(title + "\n\n")
+
+	// Estilo para o campo ativo
+	activeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00FF00")).
+		Bold(true)
+
+	// Estilo para campos inativos
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#AAAAAA"))
+
+	// Renderizar cada campo de entrada
 	for i, ti := range m.textInputs {
+		wordLabel := fmt.Sprintf("%s %d:", localization.Labels["word"], i+1)
+		paddedLabel := fmt.Sprintf("%-10s", wordLabel) // Padding para alinhamento
+
 		if i == m.importStage {
-			view.WriteString(fmt.Sprintf("%s %d: %s\n", localization.Labels["word"], i+1, ti.View()))
+			// Campo ativo com destaque
+			view.WriteString(activeStyle.Render(paddedLabel) + " " + ti.View() + "\n\n")
 		} else {
-			view.WriteString(fmt.Sprintf("%s %d: %s\n", localization.Labels["word"], i+1, ti.Value()))
+			// Campos inativos
+			view.WriteString(inactiveStyle.Render(paddedLabel) + " " + ti.Value() + "\n")
 		}
 	}
-	view.WriteString("\n" + localization.Labels["press_enter"])
-	return view.String()
+
+	// Instruções para o usuário
+	instructions := lipgloss.NewStyle().
+		MarginTop(1).
+		Italic(true).
+		Render(localization.Labels["press_enter"])
+
+	view.WriteString("\n" + instructions)
+
+	// Adicionar uma borda ao redor de tudo
+	content := view.String()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#7D56F4")).
+		Padding(1, 2).
+		Render(content)
 }
 
 // viewImportWalletPassword renderiza a visualização de senha após importação
@@ -217,6 +253,35 @@ func (m *CLIModel) viewImportWalletPassword() string {
 			localization.Labels["press_enter"],
 	)
 	return view.String()
+}
+
+// viewImportMethodSelection renderiza a visualização de seleção de método de importação
+func (m *CLIModel) viewImportMethodSelection() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	// Em vez de renderizar o menu de importação novamente, exibir apenas uma mensagem informativa
+	// já que o menu já é exibido na área padrão de menu
+	return localization.Labels["welcome_message"]
+}
+
+// viewImportPrivateKey renderiza a visualização de importação de chave privada
+func (m *CLIModel) viewImportPrivateKey() string {
+	// Use MenuTitle style for the header instead of non-existent Title style
+	title := m.styles.MenuTitle.Render(localization.Labels["private_key_title"])
+	input := m.privateKeyInput.View()
+	// Use MenuDesc instead of non-existent Instructions style
+	instructions := m.styles.MenuDesc.Render(localization.Labels["press_enter"])
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		"",
+		input,
+		"",
+		instructions,
+	)
 }
 
 // viewListWallets renderiza a visualização de listagem de wallets

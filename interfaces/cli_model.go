@@ -9,25 +9,26 @@ import (
 )
 
 type CLIModel struct {
-	Service        *usecases.WalletService
-	currentView    string
-	menuItems      []menuItem
-	selectedMenu   int
-	importWords    []string
-	importStage    int
-	textInputs     []textinput.Model
-	wallets        []domain.Wallet
-	walletCount    int
-	selectedWallet *domain.Wallet
-	err            error
-	passwordInput  textinput.Model
-	mnemonic       string
-	walletTable    table.Model
-	width          int
-	height         int
-	walletDetails  *usecases.WalletDetails
-	styles         Styles
-	fontsList      []string         // Lista de nomes de fontes carregadas do arquivo externo
-	selectedFont   *tdf.TheDrawFont // Fonte selecionada aleatoriamente
-	fontInfo       *tdf.FontInfo    // Informação da fonte selecionada
+	Service         *usecases.WalletService
+	currentView     string
+	menuItems       []menuItem
+	selectedMenu    int
+	importWords     []string
+	importStage     int
+	textInputs      []textinput.Model
+	wallets         []domain.Wallet
+	walletCount     int
+	selectedWallet  *domain.Wallet
+	err             error
+	passwordInput   textinput.Model
+	privateKeyInput textinput.Model
+	mnemonic        string
+	walletTable     table.Model
+	width           int
+	height          int
+	walletDetails   *usecases.WalletDetails
+	styles          Styles
+	fontsList       []string         // Lista de nomes de fontes carregadas do arquivo externo
+	selectedFont    *tdf.TheDrawFont // Fonte selecionada aleatoriamente
+	fontInfo        *tdf.FontInfo    // Informação da fonte selecionada
 }
