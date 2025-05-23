@@ -313,11 +313,11 @@ func (m *CLIModel) renderDeleteConfirmationDialog() string {
 	// Botões com seleção (garante espaçamento entre os textos)
 	var confirmBtn, cancelBtn string
 	if m.dialogButtonIndex == 0 {
-		confirmBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["confirm"] + " ]")
-		cancelBtn = m.styles.DialogButton.Render("[ " + localization.Labels["cancel"] + " ]")
+		confirmBtn = m.styles.DialogButtonActive.Render(localization.Labels["confirm"])
+		cancelBtn = m.styles.DialogButton.Render(localization.Labels["cancel"])
 	} else {
-		confirmBtn = m.styles.DialogButton.Render("[ " + localization.Labels["confirm"] + " ]")
-		cancelBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["cancel"] + " ]")
+		confirmBtn = m.styles.DialogButton.Render(localization.Labels["confirm"])
+		cancelBtn = m.styles.DialogButtonActive.Render(localization.Labels["cancel"])
 	}
 
 	buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, "   ", cancelBtn)

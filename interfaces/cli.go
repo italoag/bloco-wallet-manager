@@ -20,53 +20,6 @@ import (
 	"time"
 )
 
-// Lista de diretórios onde procurar fontes
-var fontsDirs []string
-
-// Adiciona um diretório à lista de diretórios onde procurar fontes
-func addFontDir(dir string) {
-	// Verificar se o diretório já existe na lista
-	for _, d := range fontsDirs {
-		if d == dir {
-			return
-		}
-	}
-	fontsDirs = append(fontsDirs, dir)
-}
-
-// Modificando a função FindFonts para procurar nos diretórios registrados
-func findFontInDirs(fontName string) *tdf.FontInfo {
-	// Primeiro, tentamos usar a função original FindFont
-	fontInfo := tdf.FindFont(fontName)
-	if fontInfo != nil {
-		return fontInfo
-	}
-
-	// Se não encontrado, procuramos manualmente nos diretórios registrados
-	for _, dir := range fontsDirs {
-		if dir == "BUILTIN" {
-			continue // Pular diretórios especiais
-		}
-
-		files, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".tdf") {
-				// Verificar se o nome da fonte corresponde
-				baseName := strings.TrimSuffix(file.Name(), ".tdf")
-				if strings.EqualFold(baseName, fontName) {
-					return tdf.NewFontInfo(file.Name(), filepath.Join(dir, file.Name()))
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 // Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
 func buildFontsList(customFontDir string) []*tdf.FontInfo {
 	var fonts []*tdf.FontInfo
