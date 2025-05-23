@@ -6,24 +6,24 @@ import (
 )
 
 type Styles struct {
-	Header          lipgloss.Style
-	Content         lipgloss.Style
-	Footer          lipgloss.Style
-	TopStrip        lipgloss.Style
-	MenuItem        lipgloss.Style
-	MenuSelected    lipgloss.Style
-	SelectedTitle   lipgloss.Style
-	MenuTitle       lipgloss.Style
-	MenuDesc        lipgloss.Style
-	ErrorStyle      lipgloss.Style
-	WalletDetails   lipgloss.Style
-	StatusBar       lipgloss.Style
-	Splash          lipgloss.Style
-	StatusBarLeft   lipgloss.Style
-	StatusBarCenter lipgloss.Style
-	StatusBarRight  lipgloss.Style
-	Dialog          lipgloss.Style
-	DialogButton    lipgloss.Style
+	Header             lipgloss.Style
+	Content            lipgloss.Style
+	Footer             lipgloss.Style
+	TopStrip           lipgloss.Style
+	MenuItem           lipgloss.Style
+	MenuSelected       lipgloss.Style
+	SelectedTitle      lipgloss.Style
+	MenuTitle          lipgloss.Style
+	MenuDesc           lipgloss.Style
+	ErrorStyle         lipgloss.Style
+	WalletDetails      lipgloss.Style
+	StatusBar          lipgloss.Style
+	Splash             lipgloss.Style
+	StatusBarLeft      lipgloss.Style
+	StatusBarCenter    lipgloss.Style
+	StatusBarRight     lipgloss.Style
+	Dialog             lipgloss.Style
+	DialogButton       lipgloss.Style
 	DialogButtonActive lipgloss.Style
 }
 
@@ -91,7 +91,6 @@ func createStyles() Styles {
 		Dialog: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")).
-			Background(lipgloss.Color("#1A1A1A")).
 			Foreground(lipgloss.Color("#F5F5F5")).
 			Padding(1, 4).
 			Align(lipgloss.Center),
@@ -101,7 +100,7 @@ func createStyles() Styles {
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			Background(lipgloss.Color("#F5F5F5")).
-			Border(lipgloss.NormalBorder()).
+			Border(lipgloss.HiddenBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")),
 		DialogButtonActive: lipgloss.NewStyle().
 			Padding(0, 2).
@@ -109,7 +108,7 @@ func createStyles() Styles {
 			Bold(true).
 			Foreground(lipgloss.Color("#F5F5F5")).
 			Background(lipgloss.Color("#7D56F4")).
-			Border(lipgloss.NormalBorder()).
+			Border(lipgloss.HiddenBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")),
 	}
 }

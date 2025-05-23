@@ -874,13 +874,13 @@ func (m *CLIModel) updateTableDimensions() {
 		return
 	}
 
-	contentAreaHeight := m.height - lipgloss.Height(m.styles.Header.Render("")) - lipgloss.Height(m.styles.Footer.Render("")) - 4
+	contentAreaHeight := m.height - lipgloss.Height(m.styles.Header.Render("")) - lipgloss.Height(m.styles.Footer.Render("")) - 2
 	if contentAreaHeight < 0 {
 		contentAreaHeight = 0
 	}
 
 	m.walletTable.SetWidth(m.width - 4)
-	m.walletTable.SetHeight(contentAreaHeight) // Usando a altura total disponível para mostrar mais wallets
+	m.walletTable.SetHeight(1000) // Definindo uma altura fixa muito grande para mostrar todas as wallets
 
 	// Calcular larguras das colunas
 	idColWidth := 10
