@@ -761,9 +761,67 @@ func (m *CLIModel) updateImportPrivateKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Diálogo de confirmação de exclusão
+	if m.deletingWallet != nil {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			switch keyMsg.String() {
+			case "left", "h":
+				if m.dialogButtonIndex > 0 {
+					m.dialogButtonIndex = 0
+				}
+				return m, nil
+			case "right", "l":
+				if m.dialogButtonIndex < 1 {
+					m.dialogButtonIndex = 1
+				}
+				return m, nil
+			case "enter":
+				if m.dialogButtonIndex == 0 {
+					// Confirmar
+					err := m.Service.DeleteWallet(m.deletingWallet)
+					if err != nil {
+						m.err = errors.Wrap(err, 0)
+					} else {
+						wallets, err := m.Service.GetAllWallets()
+						if err == nil {
+							m.wallets = wallets
+						}
+					}
+				}
+				// Limpa completamente a referência da wallet para garantir que a view não renderize o diálogo
+				m.deletingWallet = nil
+				m.dialogButtonIndex = 0
+
+				// Recarrega e atualiza a tabela de wallets
+				m.updateTableDimensions()
+				cmd := m.refreshWalletsTable()
+				return m, cmd
+			case "esc":
+				m.deletingWallet = nil
+				m.dialogButtonIndex = 0
+
+				// Recarrega e atualiza a tabela de wallets
+				m.updateTableDimensions()
+				return m, nil
+			}
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "d":
+			selectedRow := m.walletTable.SelectedRow()
+			if len(selectedRow) > 1 {
+				address := selectedRow[1]
+				for i, w := range m.wallets {
+					if w.Address == address {
+						m.deletingWallet = &m.wallets[i]
+						return m, nil
+					}
+				}
+			}
 		case "enter":
 			selectedRow := m.walletTable.SelectedRow()
 			if len(selectedRow) > 1 {
@@ -962,4 +1020,30 @@ func (m *CLIModel) initWalletPassword() {
 	m.passwordInput.EchoCharacter = '•'
 	m.passwordInput.Focus()
 	m.currentView = constants.WalletPasswordView
+}
+
+func (m *CLIModel) refreshWalletsTable() tea.Cmd {
+	return func() tea.Msg {
+		// Recarregar a lista de wallets do serviço
+		wallets, err := m.Service.GetAllWallets()
+		if err != nil {
+			m.err = errors.Wrap(err, 0)
+			return nil
+		}
+
+		// Atualizar a lista de wallets no modelo
+		m.wallets = wallets
+
+		// Reconstruir as linhas da tabela
+		var rows []table.Row
+		for _, w := range m.wallets {
+			rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
+		}
+
+		// Atualizar a tabela com as novas linhas
+		m.walletTable.SetRows(rows)
+
+		// Retornar uma mensagem vazia para indicar conclusão
+		return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+	}
 }

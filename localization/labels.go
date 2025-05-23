@@ -86,6 +86,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"wallet_password":          "Wallet Password",
 			"wallet_details":           "Wallet Details",
 			"id":                       "ID",
+			"confirm_delete_wallet":    "Are you sure you want to delete this wallet?",
+			"confirm":                  "Confirm",
+			"cancel":                   "Cancel",
 		}
 	case "pt":
 		defaultLabels = map[string]string{
@@ -131,6 +134,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"password_cannot_be_empty": "A senha não pode estar vazia.",
 			"version":                  "0.1.0",
 			"id":                       "ID",
+			"confirm_delete_wallet":    "Tem certeza de que deseja excluir esta carteira?",
+			"confirm":                  "Confirmar",
+			"cancel":                   "Cancelar",
 		}
 	case "es":
 		defaultLabels = map[string]string{
@@ -176,6 +182,9 @@ func createDefaultLabels(lang, labelsPath string) error {
 			"password_cannot_be_empty": "La contraseña no puede estar vacía.",
 			"version":                  "0.1.0",
 			"id":                       "ID",
+			"confirm_delete_wallet":    "¿Está seguro de que desea eliminar esta cartera?",
+			"confirm":                  "Confirmar",
+			"cancel":                   "Cancelar",
 		}
 	default:
 		return fmt.Errorf("unsupported language: %s", lang)

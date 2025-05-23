@@ -218,6 +218,16 @@ func (ws *WalletService) GetAllWallets() ([]domain.Wallet, error) {
 	return ws.Repo.GetAllWallets()
 }
 
+func (ws *WalletService) DeleteWallet(wallet *domain.Wallet) error {
+	// Remove o arquivo keystore do sistema
+	err := os.Remove(wallet.KeyStorePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove keystore file: %v", err)
+	}
+	// Remove do banco de dados
+	return ws.Repo.DeleteWallet(wallet.ID)
+}
+
 // Helper functions
 
 func GenerateMnemonic() (string, error) {

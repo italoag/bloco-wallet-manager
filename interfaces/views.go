@@ -290,7 +290,34 @@ func (m *CLIModel) viewListWallets() string {
 		return "Localization labels not initialized."
 	}
 
-	return m.walletTable.View()
+	if m.deletingWallet != nil {
+		// Caixa de diálogo centralizada com botões estilizados e seleção
+		question := localization.Labels["confirm_delete_wallet"]
+		address := fmt.Sprintf("%s: %s", localization.Labels["ethereum_address"], m.deletingWallet.Address)
+		// Botões com seleção (garante espaçamento entre os textos)
+		var confirmBtn, cancelBtn string
+		if m.dialogButtonIndex == 0 {
+			confirmBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["confirm"] + " ]")
+			cancelBtn = m.styles.DialogButton.Render("[ " + localization.Labels["cancel"] + " ]")
+		} else {
+			confirmBtn = m.styles.DialogButton.Render("[ " + localization.Labels["confirm"] + " ]")
+			cancelBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["cancel"] + " ]")
+		}
+		buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, "   ", cancelBtn)
+		content := lipgloss.JoinVertical(lipgloss.Center, question, address, "", buttons)
+		dialog := m.styles.Dialog.Render(content)
+		return lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			dialog,
+		)
+	}
+
+	var view strings.Builder
+	view.WriteString(m.walletTable.View())
+	return view.String()
 }
 
 // viewWalletPassword renderiza a visualização de entrada de senha para wallet selecionada

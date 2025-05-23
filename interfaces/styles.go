@@ -22,6 +22,9 @@ type Styles struct {
 	StatusBarLeft   lipgloss.Style
 	StatusBarCenter lipgloss.Style
 	StatusBarRight  lipgloss.Style
+	Dialog          lipgloss.Style
+	DialogButton    lipgloss.Style
+	DialogButtonActive lipgloss.Style
 }
 
 func createStyles() Styles {
@@ -85,5 +88,28 @@ func createStyles() Styles {
 			Background(lipgloss.Color("#CC5C87")).
 			PaddingLeft(1).
 			PaddingRight(1),
+		Dialog: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#7D56F4")).
+			Background(lipgloss.Color("#1A1A1A")).
+			Foreground(lipgloss.Color("#F5F5F5")).
+			Padding(1, 4).
+			Align(lipgloss.Center),
+		DialogButton: lipgloss.NewStyle().
+			Padding(0, 2).
+			Margin(0, 1).
+			Bold(true).
+			Foreground(lipgloss.Color("#7D56F4")).
+			Background(lipgloss.Color("#F5F5F5")).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#7D56F4")),
+		DialogButtonActive: lipgloss.NewStyle().
+			Padding(0, 2).
+			Margin(0, 1).
+			Bold(true).
+			Foreground(lipgloss.Color("#F5F5F5")).
+			Background(lipgloss.Color("#7D56F4")).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#7D56F4")),
 	}
 }
