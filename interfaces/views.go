@@ -88,7 +88,7 @@ func (m *CLIModel) renderStatusBar() string {
 		String()
 
 	// Center part: Current view and shortcut keys
-	centerContent := fmt.Sprintf("View: %s | Press 'b' or backspace to return | Press 'q' to quit", localization.Labels[m.currentView])
+	centerContent := fmt.Sprintf("View: %s | Press 'esc' or 'backspace' to return | Press 'q' to quit", localization.Labels[m.currentView])
 
 	centerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	centerStyle := m.styles.StatusBarCenter // Used assignment for copying.
@@ -255,7 +255,7 @@ func (m *CLIModel) viewImportWalletPassword() string {
 	return view.String()
 }
 
-// viewImportMethodSelection renderiza a visualização de seleção de método de importação
+// viewImportMethodSelection renderiza a visualização de seleção de methods de importação
 func (m *CLIModel) viewImportMethodSelection() string {
 	if localization.Labels == nil {
 		return "Localization labels not initialized."
@@ -290,34 +290,87 @@ func (m *CLIModel) viewListWallets() string {
 		return "Localization labels not initialized."
 	}
 
-	if m.deletingWallet != nil {
-		// Caixa de diálogo centralizada com botões estilizados e seleção
-		question := localization.Labels["confirm_delete_wallet"]
-		address := fmt.Sprintf("%s: %s", localization.Labels["ethereum_address"], m.deletingWallet.Address)
-		// Botões com seleção (garante espaçamento entre os textos)
-		var confirmBtn, cancelBtn string
-		if m.dialogButtonIndex == 0 {
-			confirmBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["confirm"] + " ]")
-			cancelBtn = m.styles.DialogButton.Render("[ " + localization.Labels["cancel"] + " ]")
-		} else {
-			confirmBtn = m.styles.DialogButton.Render("[ " + localization.Labels["confirm"] + " ]")
-			cancelBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["cancel"] + " ]")
-		}
-		buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, "   ", cancelBtn)
-		content := lipgloss.JoinVertical(lipgloss.Center, question, address, "", buttons)
-		dialog := m.styles.Dialog.Render(content)
-		return lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			dialog,
-		)
+	// Se não há diálogo de exclusão, retornar apenas a tabela
+	if m.deletingWallet == nil {
+		var view strings.Builder
+		view.WriteString(m.walletTable.View())
+		return view.String()
 	}
 
-	var view strings.Builder
-	view.WriteString(m.walletTable.View())
-	return view.String()
+	// Se há um diálogo de confirmação de exclusão, renderizar o diálogo
+	return m.renderDeleteConfirmationDialog()
+}
+
+// renderDeleteConfirmationDialog renderiza o diálogo de confirmação de exclusão
+func (m *CLIModel) renderDeleteConfirmationDialog() string {
+	// Primeiro, renderizar a tabela de wallets
+	tableView := m.walletTable.View()
+
+	// Caixa de diálogo centralizada com botões estilizados e seleção
+	question := localization.Labels["confirm_delete_wallet"]
+	address := fmt.Sprintf("%s: %s", localization.Labels["ethereum_address"], m.deletingWallet.Address)
+
+	// Botões com seleção (garante espaçamento entre os textos)
+	var confirmBtn, cancelBtn string
+	if m.dialogButtonIndex == 0 {
+		confirmBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["confirm"] + " ]")
+		cancelBtn = m.styles.DialogButton.Render("[ " + localization.Labels["cancel"] + " ]")
+	} else {
+		confirmBtn = m.styles.DialogButton.Render("[ " + localization.Labels["confirm"] + " ]")
+		cancelBtn = m.styles.DialogButtonActive.Render("[ " + localization.Labels["cancel"] + " ]")
+	}
+
+	buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, "   ", cancelBtn)
+	content := lipgloss.JoinVertical(lipgloss.Center, question, address, "", buttons)
+	dialog := m.styles.Dialog.Render(content)
+
+	// Calcular a posição do diálogo para centralizá-lo na área da tabela
+	tableWidth := lipgloss.Width(tableView)
+	tableHeight := lipgloss.Height(tableView)
+	dialogWidth := lipgloss.Width(dialog)
+	dialogHeight := lipgloss.Height(dialog)
+
+	// Calcular posições para centralizar o diálogo na tabela
+	leftPadding := (tableWidth - dialogWidth) / 2
+	if leftPadding < 0 {
+		leftPadding = 0
+	}
+
+	// Dividir a tabela em linhas
+	tableLines := strings.Split(tableView, "\n")
+
+	// Calcular a linha inicial para o diálogo
+	startLine := (tableHeight - dialogHeight) / 2
+	if startLine < 0 {
+		startLine = 0
+	}
+
+	// Dividir o diálogo em linhas
+	dialogLines := strings.Split(dialog, "\n")
+
+	// Inserir o diálogo nas linhas da tabela
+	for i := 0; i < dialogHeight && i+startLine < len(tableLines); i++ {
+		// Garantir que a linha da tabela é longa o suficiente
+		for len(tableLines[i+startLine]) < leftPadding {
+			tableLines[i+startLine] += " "
+		}
+
+		// Inserir a linha do diálogo na posição correta
+		if leftPadding < len(tableLines[i+startLine]) {
+			prefix := tableLines[i+startLine][:leftPadding]
+			suffix := ""
+			if leftPadding+dialogWidth < len(tableLines[i+startLine]) {
+				suffix = tableLines[i+startLine][leftPadding+dialogWidth:]
+			}
+			tableLines[i+startLine] = prefix + dialogLines[i] + suffix
+		} else {
+			padding := strings.Repeat(" ", leftPadding-len(tableLines[i+startLine]))
+			tableLines[i+startLine] += padding + dialogLines[i]
+		}
+	}
+
+	// Reconstruir a visualização da tabela com o diálogo
+	return strings.Join(tableLines, "\n")
 }
 
 // viewWalletPassword renderiza a visualização de entrada de senha para wallet selecionada

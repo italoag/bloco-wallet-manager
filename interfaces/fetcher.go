@@ -16,8 +16,8 @@ func walletCountCmd(service *usecases.WalletService) tea.Cmd {
 	return func() tea.Msg {
 		wallets, err := service.GetAllWallets()
 		if err != nil {
-			return walletCountMsg{count: 0, err: err}
+			return walletCountMsg{err: err}
 		}
-		return walletCountMsg{count: len(wallets), err: nil}
+		return walletCountMsg{count: len(wallets)}
 	}
 }

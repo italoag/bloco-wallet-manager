@@ -313,10 +313,10 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Tratar as teclas de navegação global (b/backspace) antes de qualquer outro processamento
+	// Tratar as teclas de navegação global (esc/backspace) antes de qualquer outro processamento
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
-		case "b", "backspace":
+		case "esc", "backspace":
 			if m.currentView != constants.DefaultView && m.currentView != constants.SplashView {
 				// Para a maioria das telas, voltar para o menu principal
 				if m.currentView == constants.WalletDetailsView {
@@ -546,7 +546,7 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case tea.KeyCtrlX.String(), "q":
 			return m, tea.Quit
-		case "b", "backspace": // Substituindo "esc" por "b" e "backspace"
+		case "esc", "backspace":
 			// Voltar para o menu principal
 			m.menuItems = NewMenu() // Recarregar o menu principal
 			m.selectedMenu = 0      // Resetar a seleção
@@ -577,7 +577,7 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -614,7 +614,7 @@ func (m *CLIModel) updateImportWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.passwordInput.Focus()
 				m.currentView = constants.ImportWalletPasswordView
 			}
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -661,7 +661,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -719,7 +719,7 @@ func (m *CLIModel) updateImportMethodSelection(msg tea.Msg) (tea.Model, tea.Cmd)
 				m.currentView = constants.DefaultView
 				m.selectedMenu = 0
 			}
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 			m.selectedMenu = 0
 		}
@@ -749,7 +749,7 @@ func (m *CLIModel) updateImportPrivateKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.passwordInput.Focus()
 			m.currentView = constants.ImportWalletPasswordView
 
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -776,38 +776,49 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "enter":
-				if m.dialogButtonIndex == 0 {
-					// Confirmar
-					err := m.Service.DeleteWallet(m.deletingWallet)
+				walletToDelete := m.deletingWallet
+				shouldDelete := m.dialogButtonIndex == 0
+
+				// Limpar a referência do diálogo antes de qualquer outra operação
+				m.deletingWallet = nil
+				m.dialogButtonIndex = 0
+
+				if shouldDelete {
+					// Executar a exclusão
+					err := m.Service.DeleteWallet(walletToDelete)
 					if err != nil {
 						m.err = errors.Wrap(err, 0)
-					} else {
-						wallets, err := m.Service.GetAllWallets()
-						if err == nil {
-							m.wallets = wallets
+					}
+
+					// Recarregar a lista de wallets
+					wallets, err := m.Service.GetAllWallets()
+					if err == nil {
+						m.wallets = wallets
+						m.walletCount = len(wallets)
+
+						// Reconstruir linhas da tabela
+						rows := make([]table.Row, len(wallets))
+						for i, w := range wallets {
+							rows[i] = table.Row{fmt.Sprintf("%d", w.ID), w.Address}
 						}
+						m.walletTable.SetRows(rows)
 					}
 				}
-				// Limpa completamente a referência da wallet para garantir que a view não renderize o diálogo
+
+				// Forçar uma atualização da tela
+				return m, m.refreshWalletsTable()
+			case "esc", "backspace":
+				// Limpar a referência do diálogo e forçar atualização
 				m.deletingWallet = nil
 				m.dialogButtonIndex = 0
-
-				// Recarrega e atualiza a tabela de wallets
-				m.updateTableDimensions()
-				cmd := m.refreshWalletsTable()
-				return m, cmd
-			case "esc":
-				m.deletingWallet = nil
-				m.dialogButtonIndex = 0
-
-				// Recarrega e atualiza a tabela de wallets
-				m.updateTableDimensions()
-				return m, nil
+				// Forçar uma atualização da tela
+				return m, m.refreshWalletsTable()
 			}
 		}
 		return m, nil
 	}
 
+	// Continuar com o código existente para quando não houver diálogo
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -835,7 +846,7 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 			return m, nil
 		}
@@ -868,7 +879,7 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -883,7 +894,7 @@ func (m *CLIModel) updateWalletDetails(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "b", "backspace":
+		case "esc", "backspace":
 			m.walletDetails = nil
 			m.currentView = constants.ListWalletsView
 			return m, nil // Return explícito para consumir o evento de teclado
@@ -1046,4 +1057,47 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 		// Retornar uma mensagem vazia para indicar conclusão
 		return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 	}
+}
+
+func (m *CLIModel) rebuildWalletsTable() {
+	// Inicialize as colunas com larguras adequadas
+	idColWidth := 10
+	addressColWidth := m.width - idColWidth - 8 // Subtrai 8 para padding e margens
+
+	if addressColWidth < 20 {
+		addressColWidth = 20
+	}
+
+	columns := []table.Column{
+		{Title: localization.Labels["id"], Width: idColWidth},
+		{Title: localization.Labels["ethereum_address"], Width: addressColWidth},
+	}
+
+	var rows []table.Row
+	for _, w := range m.wallets {
+		rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
+	}
+
+	m.walletTable = table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+	)
+
+	// Ajustar os estilos da tabela
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(true)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	s.Cell = s.Cell.Align(lipgloss.Left)
+	m.walletTable.SetStyles(s)
+
+	// Atualizar dimensões da tabela
+	m.updateTableDimensions()
 }
