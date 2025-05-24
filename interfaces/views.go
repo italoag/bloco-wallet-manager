@@ -88,7 +88,13 @@ func (m *CLIModel) renderStatusBar() string {
 		String()
 
 	// Center part: Current view and shortcut keys
-	centerContent := fmt.Sprintf("View: %s | Press 'esc' or 'backspace' to return | Press 'q' to quit", localization.Labels[m.currentView])
+	var centerContent string
+	if m.currentView == constants.ListWalletsView {
+		// Special case for wallet list view to include delete instruction
+		centerContent = fmt.Sprintf(localization.Labels["wallet_list_status_bar"], localization.Labels[m.currentView])
+	} else {
+		centerContent = fmt.Sprintf(localization.Labels["status_bar_instructions"], localization.Labels[m.currentView])
+	}
 
 	centerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	centerStyle := m.styles.StatusBarCenter // Used assignment for copying.

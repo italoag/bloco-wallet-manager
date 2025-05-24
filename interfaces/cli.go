@@ -878,7 +878,7 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "d":
+		case "d", "delete":
 			selectedRow := m.walletTable.SelectedRow()
 			if len(selectedRow) > 1 {
 				address := selectedRow[1]
