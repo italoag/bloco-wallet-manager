@@ -4,8 +4,10 @@ import (
 	"blocowallet/constants"
 	"blocowallet/localization"
 	"blocowallet/usecases"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -270,7 +272,11 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "esc", "backspace":
-			if m.currentView != constants.DefaultView && m.currentView != constants.SplashView {
+			// Se estiver na tela de lista de wallets e tiver um diálogo de exclusão aberto,
+			// não faça nada aqui e deixe o handler específico da view tratar
+			if m.currentView == constants.ListWalletsView && m.deletingWallet != nil {
+				// Não faz nada, deixa o handler específico tratar
+			} else if m.currentView != constants.DefaultView && m.currentView != constants.SplashView {
 				// Para a maioria das telas, voltar para o menu principal
 				if m.currentView == constants.WalletDetailsView {
 					// Comportamento específico para tela de detalhes: voltar para lista de wallets
@@ -364,6 +370,103 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (m *CLIModel) View() string {
+	if m.err != nil {
+		return m.styles.ErrorStyle.Render(fmt.Sprintf(localization.Labels["error_message"], m.err))
+	}
+
+	switch m.currentView {
+	case constants.SplashView:
+		return m.renderSplash()
+	case constants.ListWalletsView:
+		// Tratamento especial para a visualização de listagem de carteiras
+		// para garantir que ela se encaixe corretamente no layout
+		return m.renderListWalletsWithLayout()
+	default:
+		return m.renderMainView()
+	}
+}
+
+// renderListWalletsWithLayout renderiza a tela de listagem de carteiras com o layout completo
+func (m *CLIModel) renderListWalletsWithLayout() string {
+	// Renderizar o cabeçalho da mesma forma que renderMainView
+	var logoBuffer bytes.Buffer
+	err := figurine.Write(&logoBuffer, "bloco", "Test1.flf")
+	if err != nil {
+		log.Println(errors.Wrap(err, 0))
+		logoBuffer.WriteString("bloco")
+	}
+	renderedLogo := logoBuffer.String()
+
+	walletCount := m.walletCount
+	currentTime := time.Now().Format("02-01-2006 15:04:05")
+
+	headerLeft := lipgloss.JoinVertical(
+		lipgloss.Left,
+		renderedLogo,
+		fmt.Sprintf("Wallets: %d", walletCount),
+		fmt.Sprintf("Date: %s", currentTime),
+		fmt.Sprintf("Version: %s", localization.Labels["version"]),
+	)
+
+	menuItems := m.renderMenuItems()
+	menuGrid := lipgloss.JoinVertical(lipgloss.Left, menuItems...)
+
+	// Montar header
+	headerContent := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		headerLeft,
+		lipgloss.NewStyle().Width(m.width-lipgloss.Width(headerLeft)-lipgloss.Width(menuGrid)).Render(""),
+		menuGrid,
+	)
+
+	// Renderizar header com altura fixa
+	renderedHeader := m.styles.Header.Render(headerContent)
+	headerHeight := lipgloss.Height(renderedHeader)
+
+	// Preparar conteúdo do footer
+	renderedFooter := m.renderStatusBar()
+	footerHeight := lipgloss.Height(renderedFooter)
+
+	// Calcular altura disponível para o conteúdo
+	contentHeight := m.height - headerHeight - footerHeight - 2
+
+	// Ajustar o tamanho da tabela para caber na área de conteúdo
+	if contentHeight > 0 {
+		// Reservar espaço para título e instruções
+		titleAndInstructionsHeight := 4
+		tableHeight := contentHeight - titleAndInstructionsHeight
+
+		if tableHeight > 0 {
+			m.walletTable.SetHeight(tableHeight)
+		}
+	}
+
+	// Obter conteúdo da visualização de carteiras
+	content := m.viewListWallets()
+
+	// Renderizar o conteúdo na área apropriada
+	renderedContent := m.styles.Content.Height(contentHeight).Render(content)
+
+	// Inserir espaço vazio para empurrar o footer para baixo
+	remainingHeight := m.height - headerHeight - lipgloss.Height(renderedContent) - footerHeight
+	if remainingHeight < 0 {
+		remainingHeight = 0
+	}
+	emptySpace := lipgloss.NewStyle().Height(remainingHeight).Render("")
+
+	// Montar a visualização final
+	finalView := lipgloss.JoinVertical(
+		lipgloss.Top,
+		renderedHeader,
+		renderedContent,
+		emptySpace,
+		renderedFooter,
+	)
+
+	return finalView
+}
+
 func (m *CLIModel) renderMenuItems() []string {
 	var menuItems []string
 	for i, item := range m.menuItems {
@@ -431,19 +534,6 @@ func (m *CLIModel) renderImportMenuItems() string {
 
 	// Unir todas as linhas verticalmente
 	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
-}
-
-func (m *CLIModel) View() string {
-	if m.err != nil {
-		return m.styles.ErrorStyle.Render(fmt.Sprintf(localization.Labels["error_message"], m.err))
-	}
-
-	switch m.currentView {
-	case constants.SplashView:
-		return m.renderSplash()
-	default:
-		return m.renderMainView()
-	}
 }
 
 func (m *CLIModel) getContentView() string {
@@ -874,13 +964,24 @@ func (m *CLIModel) updateTableDimensions() {
 		return
 	}
 
-	contentAreaHeight := m.height - lipgloss.Height(m.styles.Header.Render("")) - lipgloss.Height(m.styles.Footer.Render("")) - 2
-	if contentAreaHeight < 0 {
-		contentAreaHeight = 0
+	// Calcular a altura disponível para a área de conteúdo
+	headerHeight := lipgloss.Height(m.styles.Header.Render(""))
+	footerHeight := lipgloss.Height(m.styles.Footer.Render(""))
+
+	// Reserva de espaço para o título e instruções dentro da área de conteúdo
+	titleAndInstructionsHeight := 6 // Espaço estimado para o título e as instruções
+
+	// Calcular altura final da tabela (altura total - cabeçalho - rodapé - título/instruções - margem)
+	contentAreaHeight := m.height - headerHeight - footerHeight - titleAndInstructionsHeight - 2
+
+	// Garantir que a tabela tenha pelo menos uma altura mínima
+	if contentAreaHeight < 5 {
+		contentAreaHeight = 5
 	}
 
+	// Definir largura e altura da tabela
 	m.walletTable.SetWidth(m.width - 4)
-	m.walletTable.SetHeight(1000) // Definindo uma altura fixa muito grande para mostrar todas as wallets
+	m.walletTable.SetHeight(contentAreaHeight)
 
 	// Calcular larguras das colunas
 	idColWidth := 10
@@ -982,6 +1083,13 @@ func (m *CLIModel) initListWallets() {
 	s.Cell = s.Cell.Align(lipgloss.Left)
 	m.walletTable.SetStyles(s)
 
+	// Definir altura da tabela para usar totalmente o espaço disponível
+	contentAreaHeight := m.height - lipgloss.Height(m.styles.Header.Render("")) - lipgloss.Height(m.styles.Footer.Render("")) - 2
+	if contentAreaHeight < 0 {
+		contentAreaHeight = 0
+	}
+	m.walletTable.SetHeight(contentAreaHeight)
+
 	// Atualizar dimensões da tabela
 	m.updateTableDimensions()
 
@@ -1069,6 +1177,13 @@ func (m *CLIModel) rebuildWalletsTable() {
 		Bold(false)
 	s.Cell = s.Cell.Align(lipgloss.Left)
 	m.walletTable.SetStyles(s)
+
+	// Definir altura da tabela para usar totalmente o espaço disponível
+	contentAreaHeight := m.height - lipgloss.Height(m.styles.Header.Render("")) - lipgloss.Height(m.styles.Footer.Render("")) - 2
+	if contentAreaHeight < 0 {
+		contentAreaHeight = 0
+	}
+	m.walletTable.SetHeight(contentAreaHeight)
 
 	// Atualizar dimensões da tabela
 	m.updateTableDimensions()

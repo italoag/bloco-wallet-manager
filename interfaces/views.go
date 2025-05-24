@@ -290,7 +290,30 @@ func (m *CLIModel) viewListWallets() string {
 	// Se não há diálogo de exclusão, retornar apenas a tabela
 	if m.deletingWallet == nil {
 		var view strings.Builder
-		view.WriteString(m.walletTable.View())
+
+		// Adicionar título à visualização
+		title := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#7D56F4")).
+			MarginBottom(1).
+			Render(localization.Labels["list_wallets_title"])
+
+		view.WriteString(title + "\n")
+
+		// Adicionar a visualização da tabela
+		tableView := m.walletTable.View()
+		view.WriteString(tableView)
+
+		// Se houver espaço, adicionar instruções na parte inferior
+		if m.walletTable.Height() < len(m.wallets) {
+			// Só mostra instruções de rolagem se houver mais itens que o espaço disponível
+			instructions := "\n" + lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#5C5C5C")).
+				Render(localization.Labels["list_wallets_instructions"])
+
+			view.WriteString(instructions)
+		}
+
 		return view.String()
 	}
 
