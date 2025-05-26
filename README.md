@@ -6,32 +6,22 @@
 <a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
 <img src="https://img.shields.io/github/v/release/italoag/bloco-wallet-manager?style=flat-square" alt="Latest Release">
 </a>
-
 <a href="https://github.com/italoag/bloco-wallet-manager/stargazers" style="text-decoration: none">
 <img src="https://img.shields.io/github/stars/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Stars">
 </a>
-
 <a href="https://github.com/italoag/bloco-wallet-manager/fork" style="text-decoration: none">
 <img src="https://img.shields.io/github/forks/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Forks">
 </a>
-
 <a href="https://opensource.org/licenses/MIT" style="text-decoration: none">
 <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
 </a>
-
-
-
 <br/>
-
 <a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
 <img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-informational?style=for-the-badge" alt="Downloads">
 </a>
-
  <a href="https://twitter.com/0xitalo">
         <img src="https://img.shields.io/badge/Twitter-%400xitalo-1DA1F2?logo=twitter&style=for-the-badge" alt=""/>
     </a>
-
-<br/>
 <br/>
 
 ### Table of Contents
@@ -136,6 +126,7 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes with clear messages.
 4. Submit a pull request detailing your changes.
 
+For more information, refer to the [CONTRIBUTING](CONTRIBUTING.md) file.
 
 ### License
 This project is licensed under the [MIT License](LICENSE).
