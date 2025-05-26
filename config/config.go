@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 
@@ -14,8 +15,13 @@ type Config struct {
 	DatabasePath string `yaml:"database_path"`
 }
 
+type FontsConfig struct {
+	Fonts []string `json:"fonts"`
+}
+
 func LoadConfig(appDir string) (*Config, error) {
 	configPath := filepath.Join(appDir, "config.yaml")
+	fontsPath := filepath.Join(appDir, "fonts.json")
 
 	// If config file doesn't exist, create it with default values
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -32,6 +38,25 @@ func LoadConfig(appDir string) (*Config, error) {
 		}
 
 		err = os.WriteFile(configPath, configData, 0644)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// If fonts file doesn't exist, create it with default values
+	if _, err := os.Stat(fontsPath); os.IsNotExist(err) {
+		defaultFonts := &FontsConfig{
+			Fonts: []string{
+				"1911", "dynasty", "etherx", "commx", "intensex", "icex", "royfour", "phudge", "portal", "wild",
+			},
+		}
+
+		fontsData, err := json.MarshalIndent(defaultFonts, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		err = os.WriteFile(fontsPath, fontsData, 0644)
 		if err != nil {
 			return nil, err
 		}
