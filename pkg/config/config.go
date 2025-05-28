@@ -2,113 +2,313 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
-
-	"gopkg.in/yaml.v2"
+	"sort"
 )
 
 type Config struct {
-	AppDir       string `yaml:"app_dir"`
-	Language     string `yaml:"language"`
-	WalletsDir   string `yaml:"wallets_dir"`
-	DatabasePath string `yaml:"database_path"`
-	DatabaseURL  string
-	LogLevel     string
+	Language       string             `json:"language"`
+	Networks       map[string]Network `json:"networks"`
+	CustomNetworks map[string]Network `json:"custom_networks"`
+	Database       DatabaseConfig     `json:"database"`
+	UIConfig       UIConfig           `json:"ui"`
 }
 
-type FontsConfig struct {
-	Fonts []string `json:"fonts"`
+type Network struct {
+	Name        string `json:"name"`
+	RPCEndpoint string `json:"rpc_endpoint"`
+	ChainID     int64  `json:"chain_id"`
+	Symbol      string `json:"symbol"`
+	Explorer    string `json:"explorer"`
+	IsActive    bool   `json:"is_active"`
+	IsCustom    bool   `json:"is_custom"`
 }
 
-func LoadConfig(appDir string) (*Config, error) {
-	configPath := filepath.Join(appDir, "config.yaml")
-	fontsPath := filepath.Join(appDir, "fonts.json")
+type DatabaseConfig struct {
+	Type string `json:"type"` // sqlite, postgres
+	Path string `json:"path"` // for sqlite
+	URL  string `json:"url"`  // for postgres
+}
 
-	// If config file doesn't exist, create it with default values
+type UIConfig struct {
+	Theme      string `json:"theme"`
+	ShowSplash bool   `json:"show_splash"`
+}
+
+var DefaultNetworks = map[string]Network{
+	"ethereum": {
+		Name:        "Ethereum Mainnet",
+		RPCEndpoint: "https://eth.drpc.org",
+		ChainID:     1,
+		Symbol:      "ETH",
+		Explorer:    "https://etherscan.io",
+		IsActive:    true,
+		IsCustom:    false,
+	},
+	"polygon": {
+		Name:        "Polygon",
+		RPCEndpoint: "https://polygon-rpc.com",
+		ChainID:     137,
+		Symbol:      "POL",
+		Explorer:    "https://polygonscan.com",
+		IsActive:    false,
+		IsCustom:    false,
+	},
+	"bsc": {
+		Name:        "Binance Smart Chain",
+		RPCEndpoint: "https://bsc-dataseed.binance.org",
+		ChainID:     56,
+		Symbol:      "BNB",
+		Explorer:    "https://bscscan.com",
+		IsActive:    false,
+		IsCustom:    false,
+	},
+	"arbitrum": {
+		Name:        "Arbitrum One",
+		RPCEndpoint: "https://arb1.arbitrum.io/rpc",
+		ChainID:     42161,
+		Symbol:      "ETH",
+		Explorer:    "https://arbiscan.io",
+		IsActive:    false,
+		IsCustom:    false,
+	},
+}
+
+var SupportedLanguages = map[string]string{
+	"en": "English",
+	"pt": "Português",
+	"es": "Español",
+	"fr": "Français",
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		Language:       "en",
+		Networks:       DefaultNetworks,
+		CustomNetworks: make(map[string]Network),
+		Database: DatabaseConfig{
+			Type: "sqlite",
+			Path: "wallets.db",
+		},
+		UIConfig: UIConfig{
+			Theme:      "default",
+			ShowSplash: true,
+		},
+	}
+}
+
+func LoadConfig() (*Config, error) {
+	configPath := getConfigPath()
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		defaultConfig := &Config{
-			AppDir:       appDir,
-			Language:     "en",
-			WalletsDir:   filepath.Join(appDir, "keystore"),
-			DatabasePath: filepath.Join(appDir, "wallets.db"),
-			DatabaseURL:  "postgres://user:pass@localhost/db",
-			LogLevel:     "info",
+		cfg := DefaultConfig()
+		if err := cfg.Save(); err != nil {
+			return nil, fmt.Errorf("failed to create default config: %w", err)
 		}
-
-		configData, err := yaml.Marshal(defaultConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		err = os.WriteFile(configPath, configData, 0644)
-		if err != nil {
-			return nil, err
-		}
+		return cfg, nil
 	}
 
-	// If fonts file doesn't exist, create it with default values
-	if _, err := os.Stat(fontsPath); os.IsNotExist(err) {
-		defaultFonts := &FontsConfig{
-			Fonts: []string{
-				"1911", "dynasty", "etherx", "commx", "intensex", "icex", "royfour", "phudge", "portal", "wild",
-			},
-		}
-
-		fontsData, err := json.MarshalIndent(defaultFonts, "", "  ")
-		if err != nil {
-			return nil, err
-		}
-
-		err = os.WriteFile(fontsPath, fontsData, 0644)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Load the configuration file
-	configFile, err := os.Open(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, err
-	}
-	defer func(configFile *os.File) {
-		err := configFile.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(configFile)
-
-	cfg := &Config{}
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(cfg)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Expand ~ to home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if cfg.WalletsDir != "" {
-		cfg.WalletsDir = expandPath(cfg.WalletsDir, homeDir)
-	} else {
-		cfg.WalletsDir = filepath.Join(appDir, "keystore")
+	// Merge with default networks if missing
+	if cfg.Networks == nil {
+		cfg.Networks = DefaultNetworks
 	}
 
-	if cfg.DatabasePath != "" {
-		cfg.DatabasePath = expandPath(cfg.DatabasePath, homeDir)
-	} else {
-		cfg.DatabasePath = filepath.Join(appDir, "wallets.db")
+	// Initialize custom networks if missing
+	if cfg.CustomNetworks == nil {
+		cfg.CustomNetworks = make(map[string]Network)
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
-func expandPath(path, homeDir string) string {
-	if len(path) > 1 && path[:2] == "~/" {
-		return filepath.Join(homeDir, path[2:])
+func (c *Config) Save() error {
+	configPath := getConfigPath()
+
+	// Criar diretório se não existir
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	return path
+
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+func getConfigPath() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, ".blocowallet", "config.json")
+}
+
+func (c *Config) GetActiveNetwork() *Network {
+	for _, network := range c.Networks {
+		if network.IsActive {
+			return &network
+		}
+	}
+	// Retorna Ethereum como padrão se nenhuma estiver ativa
+	if eth, exists := c.Networks["ethereum"]; exists {
+		return &eth
+	}
+	return nil
+}
+
+func (c *Config) SetActiveNetwork(networkKey string) error {
+	// Deactivate all networks first
+	for k, v := range c.Networks {
+		v.IsActive = false
+		c.Networks[k] = v
+	}
+	for k, v := range c.CustomNetworks {
+		v.IsActive = false
+		c.CustomNetworks[k] = v
+	}
+
+	// Activate the selected network
+	if network, exists := c.Networks[networkKey]; exists {
+		network.IsActive = true
+		c.Networks[networkKey] = network
+		return nil
+	}
+
+	if network, exists := c.CustomNetworks[networkKey]; exists {
+		network.IsActive = true
+		c.CustomNetworks[networkKey] = network
+		return nil
+	}
+
+	return fmt.Errorf("network %s not found", networkKey)
+}
+
+func (c *Config) UpdateNetworkRPC(networkKey, rpcEndpoint string) error {
+	if network, exists := c.Networks[networkKey]; exists {
+		network.RPCEndpoint = rpcEndpoint
+		c.Networks[networkKey] = network
+		return nil
+	}
+	return fmt.Errorf("network %s not found", networkKey)
+}
+
+func (c *Config) GetNetworkKeys() []string {
+	var keys []string
+	for key := range c.Networks {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (c *Config) GetLanguageCodes() []string {
+	var codes []string
+	for code := range SupportedLanguages {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	return codes
+}
+
+// Legacy support methods
+func (c *Config) GetDatabasePath() string {
+	return c.Database.Path
+}
+
+func (c *Config) GetRPCEndpoint() string {
+	if activeNetwork := c.GetActiveNetwork(); activeNetwork != nil {
+		return activeNetwork.RPCEndpoint
+	}
+	return "https://eth.drpc.org"
+}
+
+func (c *Config) AddCustomNetwork(key string, network Network) {
+	if c.CustomNetworks == nil {
+		c.CustomNetworks = make(map[string]Network)
+	}
+	network.IsCustom = true
+	c.CustomNetworks[key] = network
+}
+
+func (c *Config) RemoveCustomNetwork(key string) {
+	delete(c.CustomNetworks, key)
+}
+
+func (c *Config) GetCustomNetwork(key string) (Network, bool) {
+	network, exists := c.CustomNetworks[key]
+	return network, exists
+}
+
+func (c *Config) GetAllNetworks() map[string]Network {
+	allNetworks := make(map[string]Network)
+	for k, v := range c.Networks {
+		allNetworks[k] = v
+	}
+	for k, v := range c.CustomNetworks {
+		allNetworks[k] = v
+	}
+	return allNetworks
+}
+
+func (c *Config) GetAllNetworkKeys() []string {
+	var keys []string
+
+	// Add default networks
+	for key := range c.Networks {
+		keys = append(keys, key)
+	}
+
+	// Add custom networks
+	for key := range c.CustomNetworks {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+	return keys
+}
+
+func (c *Config) GetNetworkByKey(key string) (Network, bool) {
+	// Check default networks first
+	if network, exists := c.Networks[key]; exists {
+		return network, true
+	}
+
+	// Check custom networks
+	if network, exists := c.CustomNetworks[key]; exists {
+		return network, true
+	}
+
+	return Network{}, false
+}
+
+func (c *Config) UpdateNetwork(key string, network Network) error {
+	// Check if it's a default network
+	if _, exists := c.Networks[key]; exists {
+		c.Networks[key] = network
+		return nil
+	}
+
+	// Check if it's a custom network
+	if _, exists := c.CustomNetworks[key]; exists {
+		network.IsCustom = true
+		c.CustomNetworks[key] = network
+		return nil
+	}
+
+	return fmt.Errorf("network with key %s not found", key)
 }
