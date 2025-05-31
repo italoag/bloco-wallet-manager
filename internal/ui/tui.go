@@ -2,8 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"blocowallet/internal/wallet"
@@ -12,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/digitallyserviced/tdfgo/tdf"
 )
 
 // View constants
@@ -31,16 +35,16 @@ const (
 
 // Model represents the TUI application state
 type Model struct {
-	walletService  *wallet.Service
-	wallets        []*wallet.Wallet
-	selected       int
-	loading        bool
-	err            error
-	width          int
-	height         int
-	currentView    string
-	selectedWallet *wallet.Wallet
-	currentBalance *wallet.Balance
+	walletService       *wallet.Service
+	wallets             []*wallet.Wallet
+	selected            int
+	loading             bool
+	err                 error
+	width               int
+	height              int
+	currentView         string
+	selectedWallet      *wallet.Wallet
+	currentBalance      *wallet.Balance
 	currentMultiBalance *wallet.MultiNetworkBalance
 
 	// Configuration
@@ -71,6 +75,13 @@ type Model struct {
 	settingsItems []string
 	networkItems  []string
 	languageItems []string
+
+	// TDF font support
+	selectedFont *tdf.TheDrawFont
+	fontName     string
+
+	// Sensitive information visibility
+	showSensitiveInfo bool
 }
 
 // Message types
@@ -146,7 +157,8 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 	}
 	languageItems = append(languageItems, "Back to Settings")
 
-	return Model{
+	// Create the model
+	model := Model{
 		walletService:      walletService,
 		config:             cfg,
 		wallets:            []*wallet.Wallet{},
@@ -172,6 +184,75 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 		networkItems:       networkItems,
 		languageItems:      languageItems,
 	}
+
+	// Load a default TDF font
+	model.loadDefaultFont()
+
+	return model
+}
+
+// loadDefaultFont loads a default TDF font for the splash screen
+func (m *Model) loadDefaultFont() {
+	log.Println("Starting TDF font loading...")
+
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Printf("Error getting cwd: %v", err)
+		return
+	}
+	log.Printf("Current working directory: %s", cwd)
+
+	// Try different possible paths for fonts directory
+	fontBasePaths := []string{
+		"fonts",       // If running from project root
+		"../fonts",    // If running from bin directory
+		"../../fonts", // If running from nested directory
+	}
+
+	fontNames := []string{
+		"dynasty.tdf",
+		"carbonx.tdf",
+		"eleuthix.tdf",
+		"grandx.tdf",
+		"portal.tdf",
+	}
+
+	for _, basePath := range fontBasePaths {
+		for _, fontName := range fontNames {
+			fontPath := filepath.Join(basePath, fontName)
+			log.Printf("Attempting to load font: %s", fontPath)
+
+			// Check if file exists first
+			if _, err := os.Stat(fontPath); os.IsNotExist(err) {
+				log.Printf("Font file does not exist: %s", fontPath)
+				continue
+			}
+
+			// Try absolute path as well
+			absPath, _ := filepath.Abs(fontPath)
+			log.Printf("Absolute path: %s", absPath)
+
+			fontInfo := &tdf.FontInfo{
+				Path:    fontPath,
+				File:    filepath.Base(fontPath),
+				BuiltIn: false,
+			}
+
+			if fontFile, err := tdf.LoadFont(fontInfo); err == nil && len(fontFile.Fonts) > 0 {
+				m.selectedFont = &fontFile.Fonts[0] // Use the first font in the file
+				m.fontName = filepath.Base(fontPath)
+				log.Printf("Successfully loaded TDF font: %s (contains %d fonts)", fontPath, len(fontFile.Fonts))
+				return
+			} else {
+				log.Printf("Failed to load font %s: %v", fontPath, err)
+			}
+		}
+	}
+
+	// If no font loads successfully, selectedFont will remain nil
+	// and renderSplash will fall back to text rendering
+	log.Println("No TDF fonts could be loaded, using fallback text rendering")
 }
 
 // Init initializes the TUI
@@ -529,6 +610,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
 		}
 		return m, nil
+
+	case "s":
+		if m.currentView == WalletDetailsView {
+			// Toggle sensitive information visibility
+			newModel := m
+			newModel.showSensitiveInfo = !newModel.showSensitiveInfo
+			return newModel, nil
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -571,6 +661,50 @@ func (m Model) View() string {
 
 // Render methods
 func (m Model) renderSplash() string {
+	// Check if TDF font is available
+	if m.selectedFont != nil {
+		// Initialize string renderer for the selected font
+		fontString := tdf.NewTheDrawFontStringFont(m.selectedFont)
+
+		// Render the "bloco" logo using TDF font
+		renderedLogo := fontString.RenderString("bloco")
+		renderedLogo = strings.TrimSpace(renderedLogo)
+
+		// Project info
+		projectInfo := fmt.Sprintf("%s v%s", "BLOCO Wallet Manager", "1.0.0")
+
+		// Center the project info text
+		projectInfoStyled := lipgloss.NewStyle().
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("86")).
+			Render(projectInfo)
+
+		// Create the splash screen content
+		splashContent := lipgloss.JoinVertical(
+			lipgloss.Center,
+			renderedLogo,
+			"",
+			projectInfoStyled,
+			"",
+			lipgloss.NewStyle().
+				Foreground(lipgloss.Color("241")).
+				Align(lipgloss.Center).
+				Render("Press any key to continue..."),
+		)
+
+		// Use lipgloss.Place to center horizontally and vertically
+		finalSplash := lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			splashContent,
+		)
+
+		return finalSplash
+	}
+
+	// Fallback to original text-based splash if no TDF font is available
 	var b strings.Builder
 
 	logoStyle := lipgloss.NewStyle().
@@ -710,15 +844,55 @@ func (m Model) renderWalletDetails() string {
 	b.WriteString(info)
 	b.WriteString("\n\n")
 
+	// Add sensitive information section
+	sensitiveStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("208")).
+		Bold(true)
+
+	hiddenStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241"))
+
+	b.WriteString(sensitiveStyle.Render("🔐 Sensitive Information:"))
+	b.WriteString("\n")
+
+	// Private Key
+	if m.showSensitiveInfo {
+		if m.selectedWallet.Mnemonic != "" {
+			privateKey, err := wallet.DerivePrivateKey(m.selectedWallet.Mnemonic)
+			if err != nil {
+				b.WriteString(fmt.Sprintf("Private Key: Error - %v\n", err))
+			} else {
+				b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKey))
+			}
+		} else {
+			b.WriteString("Private Key: Not available (keystore-based wallet)\n")
+		}
+	} else {
+		b.WriteString(hiddenStyle.Render("Private Key: ********************************\n"))
+	}
+
+	// Mnemonic
+	if m.showSensitiveInfo {
+		if m.selectedWallet.Mnemonic != "" {
+			b.WriteString(fmt.Sprintf("Mnemonic: %s\n", m.selectedWallet.Mnemonic))
+		} else {
+			b.WriteString("Mnemonic: Not available (keystore-based wallet)\n")
+		}
+	} else {
+		b.WriteString(hiddenStyle.Render("Mnemonic: *** *** *** *** *** *** *** *** *** *** *** ***\n"))
+	}
+
+	b.WriteString("\n")
+
 	// Render multi-network balances
 	if m.currentMultiBalance != nil {
 		balanceStyle := lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("86"))
-		
+
 		networkStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
-		
+
 		errorStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196"))
 
@@ -734,12 +908,12 @@ func (m Model) renderWalletDetails() string {
 				balanceFloat := new(big.Float).SetInt(networkBalance.Amount)
 				divisor := new(big.Float).SetFloat64(math.Pow(10, float64(networkBalance.Decimals)))
 				balanceFloat.Quo(balanceFloat, divisor)
-				
+
 				balanceStr := balanceFloat.Text('f', 6)
 				// Remove trailing zeros
 				balanceStr = strings.TrimRight(balanceStr, "0")
 				balanceStr = strings.TrimRight(balanceStr, ".")
-				
+
 				b.WriteString(networkStyle.Render(fmt.Sprintf("  %s: ", networkBalance.NetworkName)))
 				b.WriteString(fmt.Sprintf("%s %s", balanceStr, networkBalance.Symbol))
 			}
@@ -762,7 +936,11 @@ func (m Model) renderWalletDetails() string {
 	}
 
 	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("r: refresh balance • esc: back • q: quit"))
+	if m.showSensitiveInfo {
+		b.WriteString(footerStyle.Render("r: refresh balance • s: hide sensitive info • esc: back • q: quit"))
+	} else {
+		b.WriteString(footerStyle.Render("r: refresh balance • s: show sensitive info • esc: back • q: quit"))
+	}
 
 	return b.String()
 }
