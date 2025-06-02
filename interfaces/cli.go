@@ -20,13 +20,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/digitallyserviced/tdfgo/tdf"
-	"github.com/go-errors/errors"
 )
 
 // Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
