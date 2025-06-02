@@ -205,9 +205,11 @@ func (m *Model) loadDefaultFont() {
 
 	// Try different possible paths for fonts directory
 	fontBasePaths := []string{
-		"fonts",       // If running from project root
-		"../fonts",    // If running from bin directory
-		"../../fonts", // If running from nested directory
+		"fonts",                // If running from project root
+		"../fonts",             // If running from bin directory
+		"../../fonts",          // If running from nested directory
+		"~/.blocowallet/fonts", // User's home directory
+		filepath.Join(os.Getenv("HOME"), ".blocowallet", "fonts"), // User's home directory
 	}
 
 	fontNames := []string{

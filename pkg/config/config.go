@@ -65,12 +65,12 @@ var DefaultNetworks = map[string]Network{
 		IsActive:    false,
 		IsCustom:    false,
 	},
-	"arbitrum": {
-		Name:        "Arbitrum One",
-		RPCEndpoint: "https://arb1.arbitrum.io/rpc",
-		ChainID:     42161,
+	"base": {
+		Name:        "Base",
+		RPCEndpoint: "https://mainnet.base.org",
+		ChainID:     8453,
 		Symbol:      "ETH",
-		Explorer:    "https://arbiscan.io",
+		Explorer:    "https://basescan.org",
 		IsActive:    false,
 		IsCustom:    false,
 	},
