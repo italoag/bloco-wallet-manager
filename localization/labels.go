@@ -11,7 +11,7 @@ var Labels map[string]string
 
 func SetLanguage(lang string, appDir string) error {
 	labelsPath := filepath.Join(appDir, "locales", fmt.Sprintf("%s.yaml", lang))
-
+	fmt.Printf("\n\n\n%s", labelsPath)
 	if _, err := os.Stat(labelsPath); os.IsNotExist(err) {
 		err := createDefaultLabels(lang, labelsPath)
 		if err != nil {
@@ -37,6 +37,7 @@ func createDefaultLabels(lang, labelsPath string) error {
 	switch lang {
 	case "en":
 		defaultLabels = map[string]string{
+
 			"welcome_message":          "Welcome to the BLOCO wallet Manager!\n\nSelect an option from the menu.",
 			"mnemonic_phrase":          "Mnemonic Phrase (Keep it Safe!):",
 			"enter_password":           "Enter a password to encrypt the wallet:",

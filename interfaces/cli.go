@@ -20,6 +20,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/digitallyserviced/tdfgo/tdf"
+	"github.com/go-errors/errors"
 )
 
 // Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
@@ -362,8 +369,12 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateListWallets(msg)
 	case constants.WalletPasswordView:
 		return m.updateWalletPassword(msg)
+	case constants.SelectWalletOperationView:
+		return m.updateSelectWalletOperation(msg)
 	case constants.WalletDetailsView:
 		return m.updateWalletDetails(msg)
+	case constants.DeleteWalletConfirmationView:
+		return m.updateDeleteWalletConfirmation(msg)
 	default:
 		m.currentView = constants.DefaultView
 		return m, nil
@@ -554,6 +565,10 @@ func (m *CLIModel) getContentView() string {
 		return m.viewListWallets()
 	case constants.WalletPasswordView:
 		return m.viewWalletPassword()
+	case constants.SelectWalletOperationView:
+		return m.viewSelectWalletOperation()
+	case constants.DeleteWalletConfirmationView:
+		return m.viewDeleteWallet()
 	case constants.WalletDetailsView:
 		return m.viewWalletDetails()
 	default:
@@ -638,6 +653,35 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			return m, cmd
 		}
 	}
+	return m, nil
+}
+
+func (m *CLIModel) updateDeleteWalletConfirmation(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			deleteConfirmation := strings.TrimSpace(m.deleteConfirmationInput.Value())
+			if strings.ToUpper(deleteConfirmation) == "DELETE" {
+				err := m.Service.DeleteWallet(m.selectedWallet.ID)
+
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+				}
+
+				m.currentView = constants.DefaultView
+			}
+
+		case "esc":
+			m.currentView = constants.DefaultView
+
+		default:
+			var cmd tea.Cmd
+			m.deleteConfirmationInput, cmd = m.deleteConfirmationInput.Update(msg)
+			return m, cmd
+		}
+	}
+
 	return m, nil
 }
 
@@ -926,6 +970,7 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
+
 			walletDetails, err := m.Service.LoadWallet(m.selectedWallet, password)
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
@@ -936,6 +981,7 @@ func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.walletDetails = walletDetails
 			m.currentView = constants.WalletDetailsView
 		case "esc", "backspace":
+
 			m.currentView = constants.DefaultView
 		default:
 			var cmd tea.Cmd
@@ -1035,6 +1081,14 @@ func (m *CLIModel) initImportWallet() {
 	m.initImportMethodSelection()
 }
 
+func (m *CLIModel) initDeleteWalletConfirmation() {
+	m.deleteConfirmationInput = textinput.New()
+	m.deleteConfirmationInput.Focus()
+	m.deleteConfirmationInput.CharLimit = len("DELETE")
+
+	m.currentView = constants.DeleteWalletConfirmationView
+}
+
 func (m *CLIModel) initListWallets() {
 	wallets, err := m.Service.GetAllWallets()
 	if err != nil {
@@ -1094,6 +1148,35 @@ func (m *CLIModel) initListWallets() {
 	m.updateTableDimensions()
 
 	m.currentView = constants.ListWalletsView
+}
+
+func (m *CLIModel) initSelectWalletOperation() {
+	columns := []table.Column{
+		{Title: localization.Labels["operation"], Width: 30},
+	}
+	rows := []table.Row{{localization.Labels["wallet_details_option"]}, {localization.Labels["wallet_delete_option"]}}
+
+	m.operationTable = table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(true)
+
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+
+	m.operationTable.SetStyles(s)
+
+	m.currentView = constants.SelectWalletOperationView
 }
 
 func (m *CLIModel) initWalletPassword() {

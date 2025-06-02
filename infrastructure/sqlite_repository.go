@@ -76,6 +76,7 @@ func (repo *SQLiteRepository) GetAllWallets() ([]domain.Wallet, error) {
 func (repo *SQLiteRepository) DeleteWallet(walletID int) error {
 	deleteQuery := `DELETE FROM wallets WHERE id = ?;`
 	_, err := repo.conn.Exec(deleteQuery, walletID)
+
 	return err
 }
 

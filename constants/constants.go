@@ -14,6 +14,9 @@ const (
 	ImportMethodSelectionView = "import_method_selection"
 	ImportPrivateKeyView      = "import_private_key"
 	ListWalletsView           = "list_wallets"
+	SelectWalletOperationView = "wallet_select_operation_view"
+	ListWalletsView           = "list_wallets"
+	DeleteWalletConfirmationView = "delete_wallet_confirmation"
 	WalletPasswordView        = "wallet_password"
 	WalletDetailsView         = "wallet_details"
 	StyleWidth                = 40
