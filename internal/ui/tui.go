@@ -18,6 +18,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/digitallyserviced/tdfgo/tdf"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // View constants
@@ -66,9 +67,8 @@ type Model struct {
 	extractedPrivateKey string
 	privateKeyError     string
 
-	// Wallet deletion confirmation
-	showingDeleteConfirmation bool
-	deleteConfirmationText    string
+	// Wallet deletion dialog
+	deleteDialog *DeleteWalletDialog
 
 	// Wallet authentication for keystore access
 	needsWalletAuth    bool
@@ -315,12 +315,42 @@ func (m *Model) loadDefaultFont() {
 
 // Init initializes the TUI
 func (m Model) Init() tea.Cmd {
+	// Initialize bubblezone manager for mouse support
+	zone.NewGlobal()
 	return tea.EnterAltScreen
 }
 
 // Update handles user input and state changes
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Se há um diálogo de exclusão ativo, processar suas mensagens primeiro
+	if m.deleteDialog != nil {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			updatedDialog, cmd := m.deleteDialog.Update(keyMsg)
+			if dialog, ok := updatedDialog.(DeleteWalletDialog); ok {
+				m.deleteDialog = &dialog
+			}
+			return m, cmd
+		}
+		if mouseMsg, ok := msg.(tea.MouseMsg); ok {
+			updatedDialog, cmd := m.deleteDialog.Update(mouseMsg)
+			if dialog, ok := updatedDialog.(DeleteWalletDialog); ok {
+				m.deleteDialog = &dialog
+			}
+			return m, cmd
+		}
+		if winMsg, ok := msg.(tea.WindowSizeMsg); ok {
+			updatedDialog, _ := m.deleteDialog.Update(winMsg)
+			if dialog, ok := updatedDialog.(DeleteWalletDialog); ok {
+				m.deleteDialog = &dialog
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		// Update bubblezone with mouse events
+		return zone.AnyInBoundsAndUpdate(m, msg)
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -383,6 +413,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.rpcEndpointInput.SetValue(msg.rpcURL)
 			}
 		}
+		return m, nil
+
+	case ConfirmDeleteMsg:
+		// Confirmar a exclusão da wallet
+		if m.deleteDialog != nil && m.selectedWallet != nil {
+			if err := m.walletService.DeleteWalletByAddress(context.Background(), m.selectedWallet.Address); err != nil {
+				m.err = fmt.Errorf("failed to delete wallet: %w", err)
+			} else {
+				// Reset state and go back to wallet list
+				m.currentView = WalletListView
+				m.selectedWallet = nil
+				m.deleteDialog = nil
+				m.showSensitiveInfo = false
+				m.extractedPrivateKey = ""
+				// Reload wallets
+				return m, tea.Cmd(func() tea.Msg {
+					wallets, err := m.walletService.GetAllWallets(context.Background())
+					if err != nil {
+						return errorMsg(err.Error())
+					}
+					return walletsLoadedMsg(wallets)
+				})
+			}
+		}
+		return m, nil
+
+	case CancelDeleteMsg:
+		// Cancelar a exclusão da wallet
+		m.deleteDialog = nil
 		return m, nil
 
 	case networkAddedMsg:
@@ -708,54 +767,21 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "d":
 		if m.currentView == WalletDetailsView && m.selectedWallet != nil {
-			// Toggle delete confirmation
-			newModel := m
-			if !newModel.showingDeleteConfirmation {
-				newModel.showingDeleteConfirmation = true
-				newModel.deleteConfirmationText = fmt.Sprintf("Are you sure you want to delete wallet '%s'? This action cannot be undone. Press 'y' to confirm or 'n' to cancel.", newModel.selectedWallet.Name)
-			} else {
-				newModel.showingDeleteConfirmation = false
-				newModel.deleteConfirmationText = ""
+			// Criar o diálogo de exclusão
+			if m.deleteDialog == nil {
+				dialog := NewDeleteWalletDialog(m.selectedWallet.Name, m.selectedWallet.Address)
+				m.deleteDialog = &dialog
 			}
-			return newModel, nil
+			return m, nil
 		}
 		return m, nil
 
 	case "y":
-		if m.currentView == WalletDetailsView && m.showingDeleteConfirmation && m.selectedWallet != nil {
-			// Confirm deletion
-			newModel := m
-			if err := newModel.walletService.DeleteWalletByAddress(context.Background(), newModel.selectedWallet.Address); err != nil {
-				newModel.err = fmt.Errorf("failed to delete wallet: %w", err)
-			} else {
-				// Reset state and go back to wallet list
-				newModel.currentView = WalletListView
-				newModel.selectedWallet = nil
-				newModel.showingDeleteConfirmation = false
-				newModel.deleteConfirmationText = ""
-				newModel.showSensitiveInfo = false
-				newModel.extractedPrivateKey = ""
-				// Reload wallets
-				return newModel, tea.Cmd(func() tea.Msg {
-					wallets, err := newModel.walletService.GetAllWallets(context.Background())
-					if err != nil {
-						return errorMsg(err.Error())
-					}
-					return walletsLoadedMsg(wallets)
-				})
-			}
-			return newModel, nil
-		}
+		// A lógica de confirmação de exclusão agora é feita pelo diálogo
 		return m, nil
 
 	case "n":
-		if m.currentView == WalletDetailsView && m.showingDeleteConfirmation {
-			// Cancel deletion
-			newModel := m
-			newModel.showingDeleteConfirmation = false
-			newModel.deleteConfirmationText = ""
-			return newModel, nil
-		}
+		// A lógica de cancelamento agora é feita pelo diálogo
 		return m, nil
 	}
 
@@ -769,36 +795,53 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	var baseView string
 	switch m.currentView {
 	case SplashView:
-		return m.renderSplash()
+		baseView = m.renderSplash()
 	case MenuView:
-		return m.renderMenu()
+		baseView = m.renderMenu()
 	case WalletListView:
-		return m.renderWalletList()
+		baseView = m.renderWalletList()
 	case WalletAuthView:
-		return m.renderWalletAuth()
+		baseView = m.renderWalletAuth()
 	case WalletDetailsView:
-		return m.renderWalletDetails()
+		baseView = m.renderWalletDetails()
 	case CreateWalletView:
-		return m.renderCreateWallet()
+		baseView = m.renderCreateWallet()
 	case ImportWalletView:
-		return m.renderImportWallet()
+		baseView = m.renderImportWallet()
 	case ImportPrivateKeyView:
-		return m.renderImportPrivateKey()
+		baseView = m.renderImportPrivateKey()
 	case SettingsView:
-		return m.renderSettings()
+		baseView = m.renderSettings()
 	case NetworkConfigView:
-		return m.renderNetworkConfig()
+		baseView = m.renderNetworkConfig()
 	case LanguageView:
-		return m.renderLanguage()
+		baseView = m.renderLanguage()
 	case AddNetworkView:
-		return m.renderAddNetwork()
+		baseView = m.renderAddNetwork()
 	case NetworkDetailsView:
-		return m.renderNetworkDetails()
+		baseView = m.renderNetworkDetails()
 	default:
-		return m.renderWalletList()
+		baseView = m.renderWalletList()
 	}
+
+	// Se há um diálogo de exclusão ativo, renderizá-lo sobre a view base
+	if m.deleteDialog != nil {
+		dialog := m.deleteDialog.View()
+
+		// Centralizar o diálogo
+		centeredDialog := lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			dialog,
+		)
+
+		return centeredDialog
+	}
+
+	return baseView
 }
 
 // Render methods
@@ -1163,23 +1206,8 @@ func (m Model) renderWalletDetails() string {
 		b.WriteString("\n\n")
 	}
 
-	// Show delete confirmation if active
-	if m.showingDeleteConfirmation {
-		confirmationStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Bold(true).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("196")).
-			Padding(1)
-
-		b.WriteString(confirmationStyle.Render("⚠️  DELETE WALLET\n\n" + m.deleteConfirmationText))
-		b.WriteString("\n\n")
-	}
-
 	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	if m.showingDeleteConfirmation {
-		b.WriteString(footerStyle.Render("y: confirm delete • n: cancel"))
-	} else if m.showSensitiveInfo {
+	if m.showSensitiveInfo {
 		b.WriteString(footerStyle.Render("r: refresh balance • s: hide sensitive info • d: delete wallet • esc: back • q: quit"))
 	} else {
 		b.WriteString(footerStyle.Render("r: refresh balance • s: show sensitive info • d: delete wallet • esc: back • q: quit"))
