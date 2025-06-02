@@ -5,15 +5,14 @@ import (
 	"blocowallet/localization"
 	"bytes"
 	"fmt"
-	"log"
-	"strings"
-	"time"
-
 	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/digitallyserviced/tdfgo/tdf"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/go-errors/errors"
+	"log"
+	"strings"
+	"time"
 )
 
 // viewCreateWalletPassword renderiza a visualização de criação de wallet
@@ -415,16 +414,6 @@ func (m *CLIModel) viewWalletPassword() string {
 	return view.String()
 }
 
-// renderiza as operações possíveis com o registro da wallet
-func (m *CLIModel) viewSelectWalletOperation() string {
-	if localization.Labels == nil {
-		return "Localization labels not initialized."
-	}
-
-	// render two options
-	return m.operationTable.View()
-}
-
 // viewWalletDetails renderiza a visualização de detalhes da wallet
 func (m *CLIModel) viewWalletDetails() string {
 	if localization.Labels == nil {
@@ -434,7 +423,7 @@ func (m *CLIModel) viewWalletDetails() string {
 	if m.walletDetails != nil {
 		var view strings.Builder
 		view.WriteString(
-			lipgloss.NewStyle().Bold(true).Render(localization.Labels["wallet_details_title"]) + "\n\n" +
+			lipgloss.NewStyle().Bold(true).Render(localization.Labels["wallet_details_title"]+"\n\n") +
 				fmt.Sprintf("%-*s %s\n", 20, localization.Labels["ethereum_address"], m.walletDetails.Wallet.Address) +
 				fmt.Sprintf("%-*s 0x%x\n", 20, localization.Labels["private_key"], crypto.FromECDSA(m.walletDetails.PrivateKey)) +
 				fmt.Sprintf("%-*s %x\n", 20, localization.Labels["public_key"], crypto.FromECDSAPub(m.walletDetails.PublicKey)) +
@@ -444,20 +433,4 @@ func (m *CLIModel) viewWalletDetails() string {
 		return view.String()
 	}
 	return localization.Labels["select_wallet_prompt"]
-}
-
-func (m *CLIModel) viewDeleteWallet() string {
-	if localization.Labels == nil {
-		return "Localization labels not initialized."
-	}
-
-	var view strings.Builder
-
-	view.WriteString(
-		lipgloss.NewStyle().Bold(true).Render(localization.Labels["delete_confirmation_message"]) + "\n\n" +
-			localization.Labels["type_delete"] + "\n\n" +
-			m.deleteConfirmationInput.View() + "\n\n" +
-			localization.Labels["press_esc"],
-	)
-	return view.String()
 }

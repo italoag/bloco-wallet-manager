@@ -1,6 +1,40 @@
 <!--suppress HtmlDeprecatedAttribute -->
 
-## Table of Contents
+<h1 align="center">🔐 BLOCO | Wallet Manager</h1>
+
+<p align="center">
+<a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
+<img src="https://img.shields.io/github/v/release/italoag/bloco-wallet-manager?style=flat-square" alt="Latest Release">
+</a>
+
+<a href="https://github.com/italoag/bloco-wallet-manager/stargazers" style="text-decoration: none">
+<img src="https://img.shields.io/github/stars/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Stars">
+</a>
+
+<a href="https://github.com/italoag/bloco-wallet-manager/fork" style="text-decoration: none">
+<img src="https://img.shields.io/github/forks/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Forks">
+</a>
+
+<a href="https://opensource.org/licenses/MIT" style="text-decoration: none">
+<img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
+</a>
+
+
+
+<br/>
+
+<a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
+<img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-informational?style=for-the-badge" alt="Downloads">
+</a>
+
+ <a href="https://twitter.com/0xitalo">
+        <img src="https://img.shields.io/badge/Twitter-%400xitalo-1DA1F2?logo=twitter&style=for-the-badge" alt=""/>
+    </a>
+
+<br/>
+<br/>
+
+### Table of Contents
 - [Introduction](#introduction)
 - [Features](#features)
 - [Installation](#installation)
@@ -9,10 +43,10 @@
 - [Contributing](#contributing)
 - [License](#license)
 
-## Introduction
+### Introduction
 **BLOCO Wallet Manager** is a command-line interface (CLI) application designed to manage cryptocurrency wallets compatible with the Ethereum network and adhering to the KeyStoreV3 standard. Developed in GoLang, BLOCO provides a Terminal User Interface (TUI) for seamless wallet management. Future integrations will include external vaults such as Hashicorp Vault, Amazon KMS, Cloud HSM, and Azure Key Vault.
 
-## Features
+### Features
 - **Wallet Management**
     - Create new wallets compatible with Ethereum.
     - Import wallets using Mnemonics.
@@ -37,26 +71,26 @@
         - Curves: secp256k1, secp256r1, ed25519
         - Algorithms: ECDSA, EdDSA
 
-## Installation
+### Installation
 Ensure you have [Go](https://golang.org/doc/install) installed on your system.
 
 ```bash
-git clone https://github.com/italoag/bloco-wallet-manager.git
-cd bloco-wallet-manager
-go build -o bwm
+git clone https://github.com/italoag/go-wallet-manager.git
+cd go-wallet-manager
+go build -o blocowm
 ```
 
 Move the executable to a directory in your PATH for easy access:
 
 ```bash
-mv bwm /usr/local/bin/
+mv blocowm /usr/local/bin/
 ```
 
-## Usage
+### Usage
 Run the BLOCO Wallet Manager using the terminal:
 
 ```bash
-bwm
+blocowm
 ```
 
 Navigate through the TUI to manage your wallets. Available commands include:
@@ -65,7 +99,7 @@ Navigate through the TUI to manage your wallets. Available commands include:
 - **Import Wallet:** Import existing wallets using Mnemonics.
 - **List Wallets:** Display all managed wallets.
 
-## Roadmap
+### Roadmap
 **Upcoming Features:**
 
 - **Vault Integrations:**
@@ -94,7 +128,7 @@ Navigate through the TUI to manage your wallets. Available commands include:
     - **Block/Unblock Wallet:** Temporarily disable or enable a wallet address.
     - **Check Balance:** View the balance of a selected wallet.
 
-## Contributing
+### Contributing
 Contributions are welcome! Please follow these steps:
 
 1. Fork the repository.
@@ -103,5 +137,5 @@ Contributions are welcome! Please follow these steps:
 4. Submit a pull request detailing your changes.
 
 
-## License
+### License
 This project is licensed under the [MIT License](LICENSE).
