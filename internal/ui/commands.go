@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"blocowallet/internal/blockchain"
 	"blocowallet/pkg/config"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -65,6 +64,17 @@ func (m Model) importWalletCmd(name, password, mnemonic string) tea.Cmd {
 	})
 }
 
+// importWalletFromPrivateKeyCmd imports a wallet from a private key
+func (m Model) importWalletFromPrivateKeyCmd(name, password, privateKey string) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		_, err := m.walletService.ImportWalletFromPrivateKey(context.Background(), name, privateKey, password)
+		if err != nil {
+			return errorMsg(err.Error())
+		}
+		return walletCreatedMsg{}
+	})
+}
+
 // Message types for network operations
 type networkAddedMsg struct {
 	key     string
@@ -73,7 +83,7 @@ type networkAddedMsg struct {
 
 type networkErrorMsg string
 
-// addNetworkCmd adds a custom network using ChainList API
+// addNetworkCmd adds a custom network using ChainList API with retry
 func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		// Parse chain ID
@@ -82,24 +92,22 @@ func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
 			return networkErrorMsg("Invalid chain ID: " + err.Error())
 		}
 
-		// Create ChainList service
-		chainListService := blockchain.NewChainListService()
-
-		// Get chain info from ChainList API
-		chainInfo, err := chainListService.GetChainInfo(chainID)
+		// Get chain info with retry mechanism
+		chainInfo, workingRPC, err := m.chainListService.GetChainInfoWithRetry(chainID)
 		if err != nil {
 			return networkErrorMsg("Failed to fetch chain info: " + err.Error())
 		}
 
-		// Validate RPC endpoint
-		if err := chainListService.ValidateRPCEndpoint(rpcEndpoint); err != nil {
-			return networkErrorMsg("RPC endpoint validation failed: " + err.Error())
+		// Use the working RPC from chainlist if no custom RPC provided
+		finalRPC := rpcEndpoint
+		if finalRPC == "" {
+			finalRPC = workingRPC
 		}
 
 		// Create network configuration
 		network := config.Network{
 			Name:        name,
-			RPCEndpoint: rpcEndpoint,
+			RPCEndpoint: finalRPC,
 			ChainID:     int64(chainInfo.ChainID),
 			Symbol:      chainInfo.NativeCurrency.Symbol,
 			Explorer:    "",
@@ -118,6 +126,31 @@ func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
 		return networkAddedMsg{
 			key:     key,
 			network: network,
+		}
+	})
+}
+
+// searchNetworksCmd searches for network suggestions by name
+func (m Model) searchNetworksCmd(query string) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		suggestions, err := m.chainListService.SearchNetworksByName(query)
+		if err != nil {
+			return errorMsg("Failed to search networks: " + err.Error())
+		}
+		return networkSuggestionsMsg(suggestions)
+	})
+}
+
+// loadChainInfoByIDCmd loads chain info using the new retry mechanism
+func (m Model) loadChainInfoByIDCmd(chainID int) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		chainInfo, rpcURL, err := m.chainListService.GetChainInfoWithRetry(chainID)
+		if err != nil {
+			return errorMsg("Failed to load chain info: " + err.Error())
+		}
+		return chainInfoLoadedMsg{
+			chainInfo: chainInfo,
+			rpcURL:    rpcURL,
 		}
 	})
 }

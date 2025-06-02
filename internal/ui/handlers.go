@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"blocowallet/internal/blockchain"
 	"blocowallet/pkg/config"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -61,6 +62,46 @@ func (m Model) handleInputSubmit() (tea.Model, tea.Cmd) {
 		}
 
 		return m, m.importWalletCmd(name, password, mnemonic)
+	} else if m.currentView == ImportPrivateKeyView {
+		name := strings.TrimSpace(m.nameInput.Value())
+		password := strings.TrimSpace(m.passwordInput.Value())
+		privateKey := strings.TrimSpace(m.privateKeyInput.Value())
+
+		if name == "" || password == "" {
+			m.err = fmt.Errorf("name and password are required")
+			return m, nil
+		}
+
+		if privateKey == "" {
+			m.err = fmt.Errorf("private key is required")
+			return m, nil
+		}
+
+		return m, m.importWalletFromPrivateKeyCmd(name, password, privateKey)
+	} else if m.currentView == WalletAuthView {
+		// Handle wallet authentication
+		password := strings.TrimSpace(m.walletAuthPassword.Value())
+		if password == "" {
+			m.walletAuthError = "Password cannot be empty"
+			return m, nil
+		}
+
+		// Try to validate keystore with password
+		_, err := m.walletService.ExtractPrivateKeyFromKeystore(m.selectedWallet.KeyStorePath, password)
+		if err != nil {
+			m.walletAuthError = fmt.Sprintf("Invalid password: %v", err)
+			m.walletAuthPassword.SetValue("")
+			return m, nil
+		}
+
+		// Authentication successful, store password and proceed to details
+		m.walletService.SetWalletPassword(m.selectedWallet.Address, password)
+		m.needsWalletAuth = false
+		m.walletAuthError = ""
+		m.walletAuthPassword.SetValue("")
+		m.walletAuthPassword.Blur()
+		m.currentView = WalletDetailsView
+		return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
 	}
 
 	return m, nil
@@ -85,24 +126,44 @@ func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			m.resetInputs()
 			m.nameInput.Focus()
 			return m, nil
-		case 2: // Import Wallet
+		case 2: // Import Wallet (Mnemonic)
 			m.currentView = ImportWalletView
 			m.resetInputs()
 			m.nameInput.Focus()
 			return m, nil
-		case 3: // Settings
+		case 3: // Import Wallet (Private Key)
+			m.currentView = ImportPrivateKeyView
+			m.resetInputs()
+			m.nameInput.Focus()
+			return m, nil
+		case 4: // Settings
 			m.currentView = SettingsView
 			m.settingsSelected = 0
 			return m, nil
-		case 4: // Exit
+		case 5: // Exit
 			return m, tea.Quit
 		}
 
 	case WalletListView:
 		if len(m.wallets) > 0 && m.selected < len(m.wallets) {
 			m.selectedWallet = m.wallets[m.selected]
-			m.currentView = WalletDetailsView
-			return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
+
+			// Reset extracted private key when switching wallets
+			m.extractedPrivateKey = ""
+
+			// Check if wallet needs authentication (has keystore)
+			if m.selectedWallet.KeyStorePath != "" {
+				m.needsWalletAuth = true
+				m.walletAuthPassword.Reset()
+				m.walletAuthPassword.Focus()
+				m.walletAuthError = ""
+				m.currentView = WalletAuthView
+				return m, nil
+			} else {
+				// Wallet doesn't need auth, go directly to details
+				m.currentView = WalletDetailsView
+				return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
+			}
 		}
 
 	case SettingsView:
@@ -246,10 +307,13 @@ func (m Model) buildLanguageItems() []string {
 
 // updateInputFocus updates which input field has focus
 func (m *Model) updateInputFocus() {
+	// First, blur all inputs
 	m.nameInput.Blur()
 	m.passwordInput.Blur()
 	m.mnemonicInput.Blur()
+	m.privateKeyInput.Blur()
 
+	// Then focus the current one
 	switch m.inputFocus {
 	case 0:
 		m.nameInput.Focus()
@@ -258,6 +322,8 @@ func (m *Model) updateInputFocus() {
 	case 2:
 		if m.currentView == ImportWalletView {
 			m.mnemonicInput.Focus()
+		} else if m.currentView == ImportPrivateKeyView {
+			m.privateKeyInput.Focus()
 		}
 	}
 }
@@ -276,13 +342,51 @@ func (m *Model) resetInputs() {
 
 // handleAddNetworkNavigation handles navigation in add network view
 func (m Model) handleAddNetworkNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If showing suggestions, handle suggestion navigation
+	if m.showingSuggestions && m.addNetworkFocus == 0 { // Only when on network name field
+		switch msg.String() {
+		case "down":
+			if m.selectedSuggestion < len(m.networkSuggestions)-1 {
+				m.selectedSuggestion++
+			}
+			return m, nil
+		case "up":
+			if m.selectedSuggestion > 0 {
+				m.selectedSuggestion--
+			}
+			return m, nil
+		case "enter":
+			// Select the current suggestion
+			if m.selectedSuggestion < len(m.networkSuggestions) {
+				suggestion := m.networkSuggestions[m.selectedSuggestion]
+				m.networkNameInput.SetValue(suggestion.Name)
+				m.chainIDInput.SetValue(fmt.Sprintf("%d", suggestion.ChainID))
+				m.showingSuggestions = false
+				m.addNetworkFocus = 1 // Move to Chain ID field
+				m.updateAddNetworkFocus()
+
+				// Load chain info to auto-fill RPC
+				return m, m.loadChainInfoByIDCmd(suggestion.ChainID)
+			}
+			return m, nil
+		case "esc":
+			m.showingSuggestions = false
+			return m, nil
+		}
+	}
+
+	// Regular navigation
 	switch msg.String() {
 	case "tab", "down":
-		m.addNetworkFocus = (m.addNetworkFocus + 1) % 3
+		if !m.showingSuggestions {
+			m.addNetworkFocus = (m.addNetworkFocus + 1) % 3
+		}
 	case "shift+tab", "up":
-		m.addNetworkFocus--
-		if m.addNetworkFocus < 0 {
-			m.addNetworkFocus = 2
+		if !m.showingSuggestions {
+			m.addNetworkFocus--
+			if m.addNetworkFocus < 0 {
+				m.addNetworkFocus = 2
+			}
 		}
 	}
 
@@ -315,6 +419,9 @@ func (m *Model) resetAddNetworkInputs() {
 	m.networkNameInput.Focus()
 	m.chainIDInput.Blur()
 	m.rpcEndpointInput.Blur()
+	m.showingSuggestions = false
+	m.networkSuggestions = []blockchain.NetworkSuggestion{}
+	m.selectedSuggestion = 0
 	m.err = nil
 }
 

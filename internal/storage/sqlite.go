@@ -43,8 +43,8 @@ func (s *SQLite) createTables() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		address TEXT UNIQUE NOT NULL,
-		keystore_path TEXT,
-		mnemonic TEXT,
+		keystore_path TEXT NOT NULL,
+		encrypted_mnemonic TEXT,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL
 	);
@@ -55,18 +55,63 @@ func (s *SQLite) createTables() error {
 		return fmt.Errorf("failed to create wallets table: %w", err)
 	}
 
+	// Add migration for encrypted_mnemonic column if it doesn't exist
+	if err := s.addEncryptedMnemonicColumn(); err != nil {
+		return fmt.Errorf("failed to migrate wallets table: %w", err)
+	}
+
+	return nil
+}
+
+// addEncryptedMnemonicColumn adds the encrypted_mnemonic column if it doesn't exist
+func (s *SQLite) addEncryptedMnemonicColumn() error {
+	// Check if column exists
+	query := `PRAGMA table_info(wallets);`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to get table info: %w", err)
+	}
+	defer rows.Close()
+
+	hasEncryptedMnemonic := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue interface{}
+		
+		err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk)
+		if err != nil {
+			return fmt.Errorf("failed to scan column info: %w", err)
+		}
+		
+		if name == "encrypted_mnemonic" {
+			hasEncryptedMnemonic = true
+			break
+		}
+	}
+
+	// Add column if it doesn't exist
+	if !hasEncryptedMnemonic {
+		alterQuery := `ALTER TABLE wallets ADD COLUMN encrypted_mnemonic TEXT;`
+		_, err := s.db.Exec(alterQuery)
+		if err != nil {
+			return fmt.Errorf("failed to add encrypted_mnemonic column: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // Create creates a new wallet in the database
 func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
 	query := `
-	INSERT INTO wallets (id, name, address, keystore_path, mnemonic, created_at, updated_at)
+	INSERT INTO wallets (id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at)
 	VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		w.ID, w.Name, w.Address, w.KeyStorePath, w.Mnemonic, w.CreatedAt, w.UpdatedAt)
+		w.ID, w.Name, w.Address, w.KeyStorePath, w.EncryptedMnemonic, w.CreatedAt, w.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create wallet: %w", err)
 	}
@@ -77,7 +122,7 @@ func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
 // GetByID retrieves a wallet by ID
 func (s *SQLite) GetByID(ctx context.Context, id string) (*wallet.Wallet, error) {
 	query := `
-	SELECT id, name, address, keystore_path, mnemonic, created_at, updated_at
+	SELECT id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at
 	FROM wallets WHERE id = ?
 	`
 
@@ -86,7 +131,7 @@ func (s *SQLite) GetByID(ctx context.Context, id string) (*wallet.Wallet, error)
 	var w wallet.Wallet
 	var createdAt, updatedAt string
 
-	err := row.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.Mnemonic, &createdAt, &updatedAt)
+	err := row.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.EncryptedMnemonic, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("wallet not found")
@@ -108,7 +153,7 @@ func (s *SQLite) GetByID(ctx context.Context, id string) (*wallet.Wallet, error)
 // GetByAddress retrieves a wallet by address
 func (s *SQLite) GetByAddress(ctx context.Context, address string) (*wallet.Wallet, error) {
 	query := `
-	SELECT id, name, address, keystore_path, mnemonic, created_at, updated_at
+	SELECT id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at
 	FROM wallets WHERE address = ?
 	`
 
@@ -117,7 +162,7 @@ func (s *SQLite) GetByAddress(ctx context.Context, address string) (*wallet.Wall
 	var w wallet.Wallet
 	var createdAt, updatedAt string
 
-	err := row.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.Mnemonic, &createdAt, &updatedAt)
+	err := row.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.EncryptedMnemonic, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("wallet not found")
@@ -139,7 +184,7 @@ func (s *SQLite) GetByAddress(ctx context.Context, address string) (*wallet.Wall
 // List retrieves all wallets
 func (s *SQLite) List(ctx context.Context) ([]*wallet.Wallet, error) {
 	query := `
-	SELECT id, name, address, keystore_path, mnemonic, created_at, updated_at
+	SELECT id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at
 	FROM wallets ORDER BY created_at DESC
 	`
 
@@ -155,7 +200,7 @@ func (s *SQLite) List(ctx context.Context) ([]*wallet.Wallet, error) {
 		var w wallet.Wallet
 		var createdAt, updatedAt string
 
-		err := rows.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.Mnemonic, &createdAt, &updatedAt)
+		err := rows.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.EncryptedMnemonic, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan wallet: %w", err)
 		}
@@ -182,12 +227,12 @@ func (s *SQLite) List(ctx context.Context) ([]*wallet.Wallet, error) {
 func (s *SQLite) Update(ctx context.Context, w *wallet.Wallet) error {
 	query := `
 	UPDATE wallets 
-	SET name = ?, address = ?, keystore_path = ?, mnemonic = ?, updated_at = ?
+	SET name = ?, address = ?, keystore_path = ?, encrypted_mnemonic = ?, updated_at = ?
 	WHERE id = ?
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		w.Name, w.Address, w.KeyStorePath, w.Mnemonic, w.UpdatedAt, w.ID)
+		w.Name, w.Address, w.KeyStorePath, w.EncryptedMnemonic, w.UpdatedAt, w.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update wallet: %w", err)
 	}

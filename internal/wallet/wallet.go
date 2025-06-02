@@ -15,13 +15,13 @@ import (
 
 // Wallet represents a blockchain wallet
 type Wallet struct {
-	ID           string    `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	Address      string    `json:"address" db:"address"`
-	KeyStorePath string    `json:"keystore_path" db:"keystore_path"`
-	Mnemonic     string    `json:"mnemonic,omitempty" db:"mnemonic"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID                string    `json:"id" db:"id"`
+	Name              string    `json:"name" db:"name"`
+	Address           string    `json:"address" db:"address"`
+	KeyStorePath      string    `json:"keystore_path" db:"keystore_path"`
+	EncryptedMnemonic string    `json:"encrypted_mnemonic,omitempty" db:"encrypted_mnemonic"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // Repository defines wallet storage operations

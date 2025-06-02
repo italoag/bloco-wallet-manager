@@ -1,16 +1,18 @@
 package ui
 
 import (
+	"blocowallet/internal/blockchain"
+	"blocowallet/internal/wallet"
+	"blocowallet/pkg/config"
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
-
-	"blocowallet/internal/wallet"
-	"blocowallet/pkg/config"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,17 +22,19 @@ import (
 
 // View constants
 const (
-	SplashView         = "splash"
-	MenuView           = "menu"
-	WalletListView     = "wallet_list"
-	WalletDetailsView  = "wallet_details"
-	CreateWalletView   = "create_wallet"
-	ImportWalletView   = "import_wallet"
-	SettingsView       = "settings"
-	NetworkConfigView  = "network_config"
-	LanguageView       = "language"
-	AddNetworkView     = "add_network"
-	NetworkDetailsView = "network_details"
+	SplashView           = "splash"
+	MenuView             = "menu"
+	WalletListView       = "wallet_list"
+	WalletAuthView       = "wallet_auth"
+	WalletDetailsView    = "wallet_details"
+	CreateWalletView     = "create_wallet"
+	ImportWalletView     = "import_wallet"
+	ImportPrivateKeyView = "import_private_key"
+	SettingsView         = "settings"
+	NetworkConfigView    = "network_config"
+	LanguageView         = "language"
+	AddNetworkView       = "add_network"
+	NetworkDetailsView   = "network_details"
 )
 
 // Model represents the TUI application state
@@ -51,10 +55,25 @@ type Model struct {
 	config *config.Config
 
 	// Input fields for wallet creation/import
-	nameInput     textinput.Model
-	passwordInput textinput.Model
-	mnemonicInput textinput.Model
-	inputFocus    int
+	nameInput       textinput.Model
+	passwordInput   textinput.Model
+	mnemonicInput   textinput.Model
+	privateKeyInput textinput.Model
+	inputFocus      int
+
+	// Private key viewing for imported wallets
+	privateKeyPassword  textinput.Model
+	extractedPrivateKey string
+	privateKeyError     string
+
+	// Wallet deletion confirmation
+	showingDeleteConfirmation bool
+	deleteConfirmationText    string
+
+	// Wallet authentication for keystore access
+	needsWalletAuth    bool
+	walletAuthPassword textinput.Model
+	walletAuthError    string
 
 	// Settings fields
 	settingsSelected int
@@ -70,6 +89,10 @@ type Model struct {
 	addNetworkFocus    int
 	addingNetwork      bool
 	selectedNetworkKey string
+	networkSuggestions []blockchain.NetworkSuggestion
+	showingSuggestions bool
+	selectedSuggestion int
+	chainListService   *blockchain.ChainListService
 
 	// Settings menu items
 	settingsItems []string
@@ -90,6 +113,11 @@ type balanceLoadedMsg *wallet.Balance
 type multiBalanceLoadedMsg *wallet.MultiNetworkBalance
 type walletCreatedMsg struct{}
 type errorMsg string
+type networkSuggestionsMsg []blockchain.NetworkSuggestion
+type chainInfoLoadedMsg struct {
+	chainInfo *blockchain.ChainInfo
+	rpcURL    string
+}
 
 // NewModel creates a new TUI model
 func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
@@ -106,6 +134,23 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 	mnemonicInput := textinput.New()
 	mnemonicInput.Placeholder = "Enter 12-word mnemonic phrase..."
 	mnemonicInput.Width = 60
+
+	privateKeyInput := textinput.New()
+	privateKeyInput.Placeholder = "Enter private key (without 0x prefix)..."
+	privateKeyInput.EchoMode = textinput.EchoPassword
+	privateKeyInput.Width = 60
+
+	// Private key password input for viewing keystore keys
+	privateKeyPassword := textinput.New()
+	privateKeyPassword.Placeholder = "Enter keystore password to view private key..."
+	privateKeyPassword.EchoMode = textinput.EchoPassword
+	privateKeyPassword.Width = 50
+
+	// Wallet authentication password input for accessing wallet details
+	walletAuthPassword := textinput.New()
+	walletAuthPassword.Placeholder = "Enter wallet password to access details..."
+	walletAuthPassword.EchoMode = textinput.EchoPassword
+	walletAuthPassword.Width = 50
 
 	// RPC input
 	rpcInput := textinput.New()
@@ -159,30 +204,41 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 
 	// Create the model
 	model := Model{
-		walletService:      walletService,
-		config:             cfg,
-		wallets:            []*wallet.Wallet{},
-		selected:           0,
-		loading:            false,
-		currentView:        SplashView,
-		nameInput:          nameInput,
-		passwordInput:      passwordInput,
-		mnemonicInput:      mnemonicInput,
-		inputFocus:         0,
-		rpcInput:           rpcInput,
-		networkNameInput:   networkNameInput,
-		chainIDInput:       chainIDInput,
-		rpcEndpointInput:   rpcEndpointInput,
-		addNetworkFocus:    0,
-		addingNetwork:      false,
-		selectedNetworkKey: "",
-		settingsSelected:   0,
-		networkSelected:    0,
-		languageSelected:   0,
-		editingRPC:         false,
-		settingsItems:      settingsItems,
-		networkItems:       networkItems,
-		languageItems:      languageItems,
+		walletService:       walletService,
+		config:              cfg,
+		wallets:             []*wallet.Wallet{},
+		selected:            0,
+		loading:             false,
+		currentView:         SplashView,
+		nameInput:           nameInput,
+		passwordInput:       passwordInput,
+		mnemonicInput:       mnemonicInput,
+		privateKeyInput:     privateKeyInput,
+		privateKeyPassword:  privateKeyPassword,
+		extractedPrivateKey: "",
+		privateKeyError:     "",
+		needsWalletAuth:     false,
+		walletAuthPassword:  walletAuthPassword,
+		walletAuthError:     "",
+		inputFocus:          0,
+		rpcInput:            rpcInput,
+		networkNameInput:    networkNameInput,
+		chainIDInput:        chainIDInput,
+		rpcEndpointInput:    rpcEndpointInput,
+		addNetworkFocus:     0,
+		addingNetwork:       false,
+		selectedNetworkKey:  "",
+		networkSuggestions:  []blockchain.NetworkSuggestion{},
+		showingSuggestions:  false,
+		selectedSuggestion:  0,
+		chainListService:    blockchain.NewChainListService(),
+		settingsSelected:    0,
+		networkSelected:     0,
+		languageSelected:    0,
+		editingRPC:          false,
+		settingsItems:       settingsItems,
+		networkItems:        networkItems,
+		languageItems:       languageItems,
 	}
 
 	// Load a default TDF font
@@ -295,15 +351,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		newModel.nameInput.SetValue("")
 		newModel.passwordInput.SetValue("")
 		newModel.mnemonicInput.SetValue("")
+		newModel.privateKeyInput.SetValue("")
 		newModel.inputFocus = 0
 		newModel.nameInput.Blur()
 		newModel.passwordInput.Blur()
 		newModel.mnemonicInput.Blur()
+		newModel.privateKeyInput.Blur()
 		return newModel, newModel.loadWalletsCmd()
 
 	case errorMsg:
 		m.err = fmt.Errorf("%s", string(msg))
 		m.loading = false
+		return m, nil
+
+	case networkSuggestionsMsg:
+		m.networkSuggestions = []blockchain.NetworkSuggestion(msg)
+		m.showingSuggestions = len(m.networkSuggestions) > 0
+		m.selectedSuggestion = 0
+		return m, nil
+
+	case chainInfoLoadedMsg:
+		// Auto-fill fields when chain info is loaded by Chain ID
+		chainInfo := msg.chainInfo
+		if chainInfo != nil {
+			// Fill network name if empty
+			if strings.TrimSpace(m.networkNameInput.Value()) == "" {
+				m.networkNameInput.SetValue(chainInfo.Name)
+			}
+			// Fill RPC endpoint if empty
+			if strings.TrimSpace(m.rpcEndpointInput.Value()) == "" {
+				m.rpcEndpointInput.SetValue(msg.rpcURL)
+			}
+		}
 		return m, nil
 
 	case networkAddedMsg:
@@ -336,8 +415,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyMsg handles keyboard input
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle input fields in create/import views, RPC editing, and add network
-	if m.currentView == CreateWalletView || m.currentView == ImportWalletView ||
+	// Handle input fields in create/import views, RPC editing, wallet auth, and add network
+	if m.currentView == CreateWalletView || m.currentView == ImportWalletView || m.currentView == ImportPrivateKeyView ||
+		m.currentView == WalletAuthView ||
 		(m.currentView == NetworkConfigView && m.editingRPC) ||
 		(m.currentView == AddNetworkView && !m.addingNetwork) {
 		switch msg.String() {
@@ -348,6 +428,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				newModel.editingRPC = false
 				newModel.rpcInput.Blur()
 				return newModel, nil
+			} else if newModel.currentView == WalletAuthView {
+				// Cancel wallet authentication and go back to wallet list
+				newModel.currentView = WalletListView
+				newModel.needsWalletAuth = false
+				newModel.walletAuthPassword.SetValue("")
+				newModel.walletAuthPassword.Blur()
+				newModel.walletAuthError = ""
+				newModel.selectedWallet = nil
+				return newModel, nil
 			}
 			newModel.currentView = MenuView
 			newModel.selected = 0
@@ -355,10 +444,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			newModel.nameInput.SetValue("")
 			newModel.passwordInput.SetValue("")
 			newModel.mnemonicInput.SetValue("")
+			newModel.privateKeyInput.SetValue("")
 			newModel.inputFocus = 0
 			newModel.nameInput.Blur()
 			newModel.passwordInput.Blur()
 			newModel.mnemonicInput.Blur()
+			newModel.privateKeyInput.Blur()
 			return newModel, nil
 		case "tab", "shift+tab", "up", "down":
 			if m.currentView == AddNetworkView {
@@ -386,7 +477,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.rpcInput.Blur()
 				return m, nil
 			} else if m.currentView == AddNetworkView {
+				// Check if we're showing suggestions first
+				if m.showingSuggestions && m.addNetworkFocus == 0 {
+					// Handle suggestion selection
+					return m.handleAddNetworkNavigation(msg)
+				}
+				// Otherwise handle form submission
 				return m.handleAddNetworkSubmit()
+			} else if m.currentView == WalletAuthView {
+				// Handle wallet authentication
+				return m.handleInputSubmit()
 			}
 			return m.handleInputSubmit()
 		default:
@@ -401,21 +501,48 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Handle add network inputs
 				switch newModel.addNetworkFocus {
 				case 0:
+					oldValue := newModel.networkNameInput.Value()
 					newModel.networkNameInput, cmd = newModel.networkNameInput.Update(msg)
+					newValue := newModel.networkNameInput.Value()
+
+					// Trigger search if value changed and has at least 2 characters
+					if oldValue != newValue && len(strings.TrimSpace(newValue)) >= 2 {
+						return newModel, tea.Batch(cmd, newModel.searchNetworksCmd(newValue))
+					}
+
+					// Hide suggestions if input is too short
+					if len(strings.TrimSpace(newValue)) < 2 {
+						newModel.showingSuggestions = false
+						newModel.networkSuggestions = []blockchain.NetworkSuggestion{}
+					}
 				case 1:
+					oldValue := newModel.chainIDInput.Value()
 					newModel.chainIDInput, cmd = newModel.chainIDInput.Update(msg)
+					newValue := newModel.chainIDInput.Value()
+
+					// Auto-load chain info when Chain ID is entered
+					if oldValue != newValue && strings.TrimSpace(newValue) != "" {
+						if chainID, err := strconv.Atoi(strings.TrimSpace(newValue)); err == nil {
+							return newModel, tea.Batch(cmd, newModel.loadChainInfoByIDCmd(chainID))
+						}
+					}
 				case 2:
 					newModel.rpcEndpointInput, cmd = newModel.rpcEndpointInput.Update(msg)
 				}
+			} else if newModel.currentView == WalletAuthView {
+				// Handle wallet authentication password input
+				newModel.walletAuthPassword, cmd = newModel.walletAuthPassword.Update(msg)
 			} else {
 				switch newModel.inputFocus {
 				case 0: // Name input
 					newModel.nameInput, cmd = newModel.nameInput.Update(msg)
 				case 1: // Password input
 					newModel.passwordInput, cmd = newModel.passwordInput.Update(msg)
-				case 2: // Mnemonic input (only in import view)
+				case 2: // Mnemonic input (only in import view) or Private Key input (only in import private key view)
 					if newModel.currentView == ImportWalletView {
 						newModel.mnemonicInput, cmd = newModel.mnemonicInput.Update(msg)
+					} else if newModel.currentView == ImportPrivateKeyView {
+						newModel.privateKeyInput, cmd = newModel.privateKeyInput.Update(msg)
 					}
 				}
 			}
@@ -431,9 +558,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "esc":
 		switch m.currentView {
+		case WalletAuthView:
+			m.currentView = WalletListView
+			m.needsWalletAuth = false
+			m.walletAuthPassword.Reset()
+			m.walletAuthError = ""
 		case WalletDetailsView:
 			m.currentView = WalletListView
-		case CreateWalletView, ImportWalletView:
+		case CreateWalletView, ImportWalletView, ImportPrivateKeyView:
 			m.currentView = MenuView
 			m.selected = 0
 			m.resetInputs()
@@ -498,7 +630,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		maxItems := 0
 		if m.currentView == MenuView {
-			maxItems = 4 // 5 menu items (0-4)
+			maxItems = 5 // 6 menu items (0-5)
 		} else if m.currentView == WalletListView {
 			maxItems = len(m.wallets) - 1
 		} else if m.currentView == SettingsView {
@@ -528,32 +660,20 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "a", "A":
-		// Activate/deactivate network
+		// Toggle network active/inactive status (allows multiple active networks)
 		if m.currentView == NetworkConfigView && !m.editingRPC {
 			networkKeys := m.config.GetAllNetworkKeys()
 			if m.networkSelected < len(networkKeys) {
 				key := networkKeys[m.networkSelected]
-				if network, exists := m.config.GetNetworkByKey(key); exists {
-					// Deactivate all networks first
-					for k, net := range m.config.Networks {
-						net.IsActive = false
-						m.config.Networks[k] = net
-					}
-					for k, net := range m.config.CustomNetworks {
-						net.IsActive = false
-						m.config.CustomNetworks[k] = net
-					}
 
-					// Activate selected network
-					network.IsActive = true
-					if network.IsCustom {
-						m.config.CustomNetworks[key] = network
-					} else {
-						m.config.Networks[key] = network
-					}
-
+				// Toggle network active status
+				err := m.config.ToggleNetworkActive(key)
+				if err == nil {
 					// Refresh network items to show updated status
 					m.refreshNetworkItems()
+
+					// Refresh multi-provider with updated network configuration
+					m.walletService.RefreshMultiProvider(m.config)
 
 					// Save configuration
 					_ = m.config.Save()
@@ -577,47 +697,63 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "d", "D":
-		// Delete custom network (only for custom networks)
-		if m.currentView == NetworkConfigView && !m.editingRPC {
-			networkKeys := m.config.GetAllNetworkKeys()
-			if m.networkSelected < len(networkKeys) {
-				key := networkKeys[m.networkSelected]
-				if network, exists := m.config.GetNetworkByKey(key); exists && network.IsCustom {
-					// Remove custom network
-					m.config.RemoveCustomNetwork(key)
-
-					// Refresh network items
-					m.refreshNetworkItems()
-
-					// Adjust selection if needed
-					if m.networkSelected >= len(m.networkItems)-2 { // -2 for "Add Custom Network" and "Back to Settings"
-						m.networkSelected = len(m.networkItems) - 3 // Select last actual network
-						if m.networkSelected < 0 {
-							m.networkSelected = 0
-						}
-					}
-
-					// Save configuration
-					_ = m.config.Save()
-				}
-			}
-		}
-		return m, nil
-
-	case "r":
-		if m.currentView == WalletListView {
-			return m, m.loadWalletsCmd()
-		} else if m.currentView == WalletDetailsView && m.selectedWallet != nil {
-			return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
-		}
-		return m, nil
-
 	case "s":
-		if m.currentView == WalletDetailsView {
+		if m.currentView == WalletDetailsView && m.selectedWallet != nil {
 			// Toggle sensitive information visibility
 			newModel := m
 			newModel.showSensitiveInfo = !newModel.showSensitiveInfo
+			return newModel, nil
+		}
+		return m, nil
+
+	case "d":
+		if m.currentView == WalletDetailsView && m.selectedWallet != nil {
+			// Toggle delete confirmation
+			newModel := m
+			if !newModel.showingDeleteConfirmation {
+				newModel.showingDeleteConfirmation = true
+				newModel.deleteConfirmationText = fmt.Sprintf("Are you sure you want to delete wallet '%s'? This action cannot be undone. Press 'y' to confirm or 'n' to cancel.", newModel.selectedWallet.Name)
+			} else {
+				newModel.showingDeleteConfirmation = false
+				newModel.deleteConfirmationText = ""
+			}
+			return newModel, nil
+		}
+		return m, nil
+
+	case "y":
+		if m.currentView == WalletDetailsView && m.showingDeleteConfirmation && m.selectedWallet != nil {
+			// Confirm deletion
+			newModel := m
+			if err := newModel.walletService.DeleteWalletByAddress(context.Background(), newModel.selectedWallet.Address); err != nil {
+				newModel.err = fmt.Errorf("failed to delete wallet: %w", err)
+			} else {
+				// Reset state and go back to wallet list
+				newModel.currentView = WalletListView
+				newModel.selectedWallet = nil
+				newModel.showingDeleteConfirmation = false
+				newModel.deleteConfirmationText = ""
+				newModel.showSensitiveInfo = false
+				newModel.extractedPrivateKey = ""
+				// Reload wallets
+				return newModel, tea.Cmd(func() tea.Msg {
+					wallets, err := newModel.walletService.GetAllWallets(context.Background())
+					if err != nil {
+						return errorMsg(err.Error())
+					}
+					return walletsLoadedMsg(wallets)
+				})
+			}
+			return newModel, nil
+		}
+		return m, nil
+
+	case "n":
+		if m.currentView == WalletDetailsView && m.showingDeleteConfirmation {
+			// Cancel deletion
+			newModel := m
+			newModel.showingDeleteConfirmation = false
+			newModel.deleteConfirmationText = ""
 			return newModel, nil
 		}
 		return m, nil
@@ -640,12 +776,16 @@ func (m Model) View() string {
 		return m.renderMenu()
 	case WalletListView:
 		return m.renderWalletList()
+	case WalletAuthView:
+		return m.renderWalletAuth()
 	case WalletDetailsView:
 		return m.renderWalletDetails()
 	case CreateWalletView:
 		return m.renderCreateWallet()
 	case ImportWalletView:
 		return m.renderImportWallet()
+	case ImportPrivateKeyView:
+		return m.renderImportPrivateKey()
 	case SettingsView:
 		return m.renderSettings()
 	case NetworkConfigView:
@@ -751,7 +891,8 @@ func (m Model) renderMenu() string {
 	menuItems := []string{
 		"📋 View Wallets",
 		"➕ Create New Wallet",
-		"📥 Import Wallet",
+		"📥 Import Wallet (Mnemonic)",
+		"🔑 Import Wallet (Private Key)",
 		"⚙️  Settings",
 		"🚪 Exit",
 	}
@@ -822,6 +963,47 @@ func (m Model) renderWalletList() string {
 	return b.String()
 }
 
+func (m Model) renderWalletAuth() string {
+	var b strings.Builder
+
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("86")).
+		MarginBottom(2)
+
+	b.WriteString(headerStyle.Render("🔐 Wallet Authentication"))
+	b.WriteString("\n\n")
+
+	if m.selectedWallet != nil {
+		infoStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
+
+		b.WriteString(infoStyle.Render(fmt.Sprintf("Wallet: %s", m.selectedWallet.Name)))
+		b.WriteString("\n")
+		b.WriteString(infoStyle.Render(fmt.Sprintf("Address: %s", m.selectedWallet.Address)))
+		b.WriteString("\n\n")
+	}
+
+	b.WriteString("Enter wallet password to access details:\n\n")
+
+	// Password input
+	b.WriteString("Password:\n")
+	b.WriteString(m.walletAuthPassword.View())
+	b.WriteString("\n\n")
+
+	// Show error if any
+	if m.walletAuthError != "" {
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+		b.WriteString(errorStyle.Render("❌ " + m.walletAuthError))
+		b.WriteString("\n\n")
+	}
+
+	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	b.WriteString(footerStyle.Render("enter: authenticate • esc: back • q: quit"))
+
+	return b.String()
+}
+
 func (m Model) renderWalletDetails() string {
 	var b strings.Builder
 
@@ -843,7 +1025,14 @@ func (m Model) renderWalletDetails() string {
 		m.selectedWallet.Address,
 		m.selectedWallet.CreatedAt.Format("2006-01-02 15:04:05"))
 
+	// Debug information
+	debugInfo := fmt.Sprintf("\nDebug Info:\n- Has Encrypted Mnemonic: %t\n- Has KeyStore: %t\n- KeyStore Path: %s",
+		m.selectedWallet.EncryptedMnemonic != "",
+		m.selectedWallet.KeyStorePath != "",
+		m.selectedWallet.KeyStorePath)
+
 	b.WriteString(info)
+	b.WriteString(debugInfo)
 	b.WriteString("\n\n")
 
 	// Add sensitive information section
@@ -851,37 +1040,81 @@ func (m Model) renderWalletDetails() string {
 		Foreground(lipgloss.Color("208")).
 		Bold(true)
 
-	hiddenStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241"))
-
 	b.WriteString(sensitiveStyle.Render("🔐 Sensitive Information:"))
 	b.WriteString("\n")
 
 	// Private Key
 	if m.showSensitiveInfo {
-		if m.selectedWallet.Mnemonic != "" {
-			privateKey, err := wallet.DerivePrivateKey(m.selectedWallet.Mnemonic)
-			if err != nil {
-				b.WriteString(fmt.Sprintf("Private Key: Error - %v\n", err))
+		if m.selectedWallet.EncryptedMnemonic != "" {
+			// Get cached password for this wallet
+			password, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address)
+			if hasPassword {
+				// Decrypt mnemonic and derive private key
+				mnemonic, err := m.walletService.GetMnemonicFromWallet(m.selectedWallet, password)
+				if err != nil {
+					b.WriteString(fmt.Sprintf("Private Key: Error decrypting mnemonic - %v\n", err))
+				} else {
+					privateKey, err := wallet.DerivePrivateKey(mnemonic)
+					if err != nil {
+						b.WriteString(fmt.Sprintf("Private Key: Error deriving key - %v\n", err))
+					} else {
+						b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKey))
+					}
+				}
 			} else {
-				b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKey))
+				b.WriteString("Private Key: Authentication required\n")
+			}
+		} else if m.selectedWallet.KeyStorePath != "" {
+			// Handle keystore-based wallets (both mnemonic-based and private key imports)
+			if m.extractedPrivateKey != "" {
+				// Private key has been successfully extracted
+				b.WriteString(fmt.Sprintf("Private Key: %s\n", m.extractedPrivateKey))
+			} else {
+				// Try to extract using cached password
+				if cachedPassword, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address); hasPassword {
+					privateKey, err := m.walletService.LoadPrivateKeyFromKeyStoreV3(m.selectedWallet.KeyStorePath, cachedPassword)
+					if err != nil {
+						b.WriteString(fmt.Sprintf("Private Key: Error - %s\n", err.Error()))
+					} else {
+						// Cache the extracted private key for subsequent renders
+						privateKeyHex := fmt.Sprintf("%x", privateKey.D.Bytes())
+						m.extractedPrivateKey = privateKeyHex
+						b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKeyHex))
+					}
+				} else {
+					// This shouldn't happen since we require auth before entering details
+					b.WriteString("Private Key: Authentication required\n")
+				}
 			}
 		} else {
-			b.WriteString("Private Key: Not available (keystore-based wallet)\n")
+			// Neither mnemonic nor keystore path available - this should be rare
+			b.WriteString("Private Key: Not available (no keystore or mnemonic found)\n")
 		}
 	} else {
-		b.WriteString(hiddenStyle.Render("Private Key: ********************************\n"))
+		b.WriteString("Private Key: ********************************\n")
 	}
 
 	// Mnemonic
 	if m.showSensitiveInfo {
-		if m.selectedWallet.Mnemonic != "" {
-			b.WriteString(fmt.Sprintf("Mnemonic: %s\n", m.selectedWallet.Mnemonic))
+		if m.selectedWallet.EncryptedMnemonic != "" {
+			// Get cached password for this wallet
+			password, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address)
+			if hasPassword {
+				// Decrypt mnemonic
+				mnemonic, err := m.walletService.GetMnemonicFromWallet(m.selectedWallet, password)
+				if err != nil {
+					b.WriteString(fmt.Sprintf("Mnemonic: Error decrypting - %v\n", err))
+				} else {
+					b.WriteString(fmt.Sprintf("Mnemonic: %s\n", mnemonic))
+				}
+			} else {
+				b.WriteString("Mnemonic: Authentication required\n")
+			}
 		} else {
-			b.WriteString("Mnemonic: Not available (keystore-based wallet)\n")
+			b.WriteString("Mnemonic: Not available (imported from private key)\n")
 		}
 	} else {
-		b.WriteString(hiddenStyle.Render("Mnemonic: *** *** *** *** *** *** *** *** *** *** *** ***\n"))
+		b.WriteString("Mnemonic: *** *** *** *** *** *** *** *** *** *** *** ***\n")
 	}
 
 	b.WriteString("\n")
@@ -937,11 +1170,26 @@ func (m Model) renderWalletDetails() string {
 		b.WriteString("\n\n")
 	}
 
+	// Show delete confirmation if active
+	if m.showingDeleteConfirmation {
+		confirmationStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("196")).
+			Padding(1)
+
+		b.WriteString(confirmationStyle.Render("⚠️  DELETE WALLET\n\n" + m.deleteConfirmationText))
+		b.WriteString("\n\n")
+	}
+
 	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	if m.showSensitiveInfo {
-		b.WriteString(footerStyle.Render("r: refresh balance • s: hide sensitive info • esc: back • q: quit"))
+	if m.showingDeleteConfirmation {
+		b.WriteString(footerStyle.Render("y: confirm delete • n: cancel"))
+	} else if m.showSensitiveInfo {
+		b.WriteString(footerStyle.Render("r: refresh balance • s: hide sensitive info • d: delete wallet • esc: back • q: quit"))
 	} else {
-		b.WriteString(footerStyle.Render("r: refresh balance • s: show sensitive info • esc: back • q: quit"))
+		b.WriteString(footerStyle.Render("r: refresh balance • s: show sensitive info • d: delete wallet • esc: back • q: quit"))
 	}
 
 	return b.String()
@@ -1008,6 +1256,46 @@ func (m Model) renderImportWallet() string {
 	// Mnemonic input
 	b.WriteString("Mnemonic Phrase (12 words):\n")
 	b.WriteString(m.mnemonicInput.View())
+	b.WriteString("\n\n")
+
+	if m.err != nil {
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
+		b.WriteString("\n\n")
+	}
+
+	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	b.WriteString(footerStyle.Render("tab: next field • enter: import wallet • esc: back • q: quit"))
+
+	return b.String()
+}
+
+func (m Model) renderImportPrivateKey() string {
+	var b strings.Builder
+
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("86")).
+		MarginBottom(2)
+
+	b.WriteString(headerStyle.Render("🔑 Import Wallet from Private Key"))
+	b.WriteString("\n\n")
+
+	b.WriteString("Fill in the details to import an existing wallet from a private key:\n\n")
+
+	// Name input
+	b.WriteString("Wallet Name:\n")
+	b.WriteString(m.nameInput.View())
+	b.WriteString("\n\n")
+
+	// Password input
+	b.WriteString("Password:\n")
+	b.WriteString(m.passwordInput.View())
+	b.WriteString("\n\n")
+
+	// Private Key input
+	b.WriteString("Private Key (without 0x prefix):\n")
+	b.WriteString(m.privateKeyInput.View())
 	b.WriteString("\n\n")
 
 	if m.err != nil {

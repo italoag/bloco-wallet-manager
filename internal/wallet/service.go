@@ -3,14 +3,47 @@ package wallet
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"blocowallet/internal/blockchain"
+	"blocowallet/pkg/config"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+)
+
+// KeystoreFile represents the structure of a keystore JSON file
+type KeystoreFile struct {
+	Address string `json:"address"`
+	Crypto  struct {
+		Cipher       string `json:"cipher"`
+		CipherText   string `json:"ciphertext"`
+		CipherParams struct {
+			IV string `json:"iv"`
+		} `json:"cipherparams"`
+		KDF       string `json:"kdf"`
+		KDFParams struct {
+			DKLen int    `json:"dklen"`
+			Salt  string `json:"salt"`
+			N     int    `json:"n"`
+			R     int    `json:"r"`
+			P     int    `json:"p"`
+		} `json:"kdfparams"`
+		MAC string `json:"mac"`
+	} `json:"crypto"`
+	ID      string `json:"id"`
+	Version int    `json:"version"`
+}
+
+// KeyStore V3 constants
+const (
+	KeyStoreV3Dir   = ".blocowallet/keystore"
+	KeyStoreVersion = 3
 )
 
 // Service provides wallet business logic
@@ -19,6 +52,7 @@ type Service struct {
 	balanceProvider BalanceProvider
 	multiProvider   *blockchain.MultiProvider
 	keystore        *keystore.KeyStore
+	passwordCache   map[string]string // Cache for wallet passwords
 }
 
 // NewService creates a new wallet service
@@ -26,6 +60,7 @@ func NewService(repo Repository, balanceProvider BalanceProvider) *Service {
 	return &Service{
 		repo:            repo,
 		balanceProvider: balanceProvider,
+		passwordCache:   make(map[string]string),
 	}
 }
 
@@ -34,6 +69,7 @@ func NewServiceWithMultiProvider(repo Repository, multiProvider *blockchain.Mult
 	return &Service{
 		repo:          repo,
 		multiProvider: multiProvider,
+		passwordCache: make(map[string]string),
 	}
 }
 
@@ -43,6 +79,7 @@ func NewServiceWithKeystore(repo Repository, balanceProvider BalanceProvider, ks
 		repo:            repo,
 		balanceProvider: balanceProvider,
 		keystore:        ks,
+		passwordCache:   make(map[string]string),
 	}
 }
 
@@ -52,6 +89,7 @@ func NewServiceWithMultiProviderAndKeystore(repo Repository, multiProvider *bloc
 		repo:          repo,
 		multiProvider: multiProvider,
 		keystore:      ks,
+		passwordCache: make(map[string]string),
 	}
 }
 
@@ -207,25 +245,27 @@ func (s *Service) CreateWalletWithMnemonic(ctx context.Context, name, password s
 	// Get address
 	address := GetAddressFromPrivateKey(privKey)
 
-	// Create keystore file if keystore is available
-	var keystorePath string
-	if s.keystore != nil {
-		account, err := s.keystore.ImportECDSA(privKey, password)
-		if err != nil {
-			return nil, fmt.Errorf("failed to import key to keystore: %w", err)
-		}
-		keystorePath = account.URL.Path
+	// Create KeyStore V3 file in proper directory structure
+	keystorePath, err := s.CreateKeyStoreV3File(privKey, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keystore file: %w", err)
 	}
 
-	// Create wallet entity
+	// Encrypt mnemonic for secure storage in database
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt mnemonic: %w", err)
+	}
+
+	// Create wallet entity - store encrypted mnemonic
 	wallet := &Wallet{
-		ID:           uuid.New().String(),
-		Name:         name,
-		Address:      address,
-		KeyStorePath: keystorePath,
-		Mnemonic:     mnemonic,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:                uuid.New().String(),
+		Name:              name,
+		Address:           address,
+		KeyStorePath:      keystorePath,
+		EncryptedMnemonic: encryptedMnemonic,
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
 	}
 
 	// Save to repository
@@ -291,25 +331,27 @@ func (s *Service) ImportWalletFromMnemonic(ctx context.Context, name, mnemonic, 
 		return nil, fmt.Errorf("wallet with address %s already exists", address)
 	}
 
-	// Create keystore file if keystore is available
-	var keystorePath string
-	if s.keystore != nil {
-		account, err := s.keystore.ImportECDSA(privKey, password)
-		if err != nil {
-			return nil, fmt.Errorf("failed to import key to keystore: %w", err)
-		}
-		keystorePath = account.URL.Path
+	// Create KeyStore V3 file in proper directory structure
+	keystorePath, err := s.CreateKeyStoreV3File(privKey, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keystore file: %w", err)
 	}
 
-	// Create wallet entity
+	// Encrypt mnemonic for secure storage in database
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt mnemonic: %w", err)
+	}
+
+	// Create wallet entity - store encrypted mnemonic
 	wallet := &Wallet{
-		ID:           uuid.New().String(),
-		Name:         name,
-		Address:      address,
-		KeyStorePath: keystorePath,
-		Mnemonic:     mnemonic,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:                uuid.New().String(),
+		Name:              name,
+		Address:           address,
+		KeyStorePath:      keystorePath,
+		EncryptedMnemonic: encryptedMnemonic,
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
 	}
 
 	// Save to repository
@@ -334,6 +376,194 @@ func (s *Service) ImportWalletFromMnemonic(ctx context.Context, name, mnemonic, 
 		PrivateKey: privKey,
 		PublicKey:  publicKeyECDSA,
 	}, nil
+}
+
+// ImportWalletFromPrivateKey imports a wallet from a private key
+func (s *Service) ImportWalletFromPrivateKey(ctx context.Context, name, privateKeyHex, password string) (*WalletDetails, error) {
+	if name == "" {
+		return nil, fmt.Errorf("wallet name cannot be empty")
+	}
+
+	if privateKeyHex == "" {
+		return nil, fmt.Errorf("private key cannot be empty")
+	}
+
+	if password == "" {
+		return nil, fmt.Errorf("password cannot be empty")
+	}
+
+	// Remove 0x prefix if present
+	if len(privateKeyHex) > 2 && privateKeyHex[:2] == "0x" {
+		privateKeyHex = privateKeyHex[2:]
+	}
+
+	// Convert hex string to ECDSA private key
+	privKey, err := HexToECDSA(privateKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid private key: %w", err)
+	}
+
+	// Derive address from private key
+	address := GetAddressFromPrivateKey(privKey)
+
+	// Check if wallet already exists
+	existingWallets, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing wallets: %w", err)
+	}
+
+	for _, existingWallet := range existingWallets {
+		if existingWallet.Address == address {
+			return nil, fmt.Errorf("wallet with address %s already exists", address)
+		}
+		if existingWallet.Name == name {
+			return nil, fmt.Errorf("wallet with name %s already exists", name)
+		}
+	}
+
+	// Create KeyStore V3 file to store the private key securely
+	keystorePath, err := s.CreateKeyStoreV3File(privKey, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keystore file: %w", err)
+	}
+
+	// Create wallet object - NO private key stored in database, only keystore path
+	// Private key imports don't have mnemonic, so EncryptedMnemonic is empty
+	wallet := &Wallet{
+		ID:                uuid.New().String(),
+		Name:              name,
+		Address:           address,
+		KeyStorePath:      keystorePath,
+		EncryptedMnemonic: "", // Private key imports don't have mnemonic
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+
+	// Save to repository
+	err = s.repo.Create(ctx, wallet)
+	if err != nil {
+		// If database save fails and keystore was created, try to clean up
+		if s.keystore != nil && keystorePath != "" {
+			os.Remove(keystorePath)
+		}
+		return nil, fmt.Errorf("failed to save wallet: %w", err)
+	}
+
+	// Get public key
+	publicKey := privKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("failed to get public key")
+	}
+
+	return &WalletDetails{
+		Wallet:     wallet,
+		PrivateKey: privKey,
+		PublicKey:  publicKeyECDSA,
+	}, nil
+}
+
+// ExtractPrivateKeyFromKeystore extracts the private key from a keystore file
+func (s *Service) ExtractPrivateKeyFromKeystore(keystorePath, password string) (string, error) {
+	if keystorePath == "" {
+		return "", fmt.Errorf("keystore path is empty")
+	}
+
+	if password == "" {
+		return "", fmt.Errorf("password is required to decrypt keystore")
+	}
+
+	// Use the new LoadPrivateKeyFromKeyStoreV3 method
+	privateKey, err := s.LoadPrivateKeyFromKeyStoreV3(keystorePath, password)
+	if err != nil {
+		return "", fmt.Errorf("failed to load private key from keystore: %w", err)
+	}
+
+	// Convert private key to hex string
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	return hex.EncodeToString(privateKeyBytes), nil
+}
+
+// CreateKeyStoreV3File creates a KeyStore V3 file in the proper directory structure
+func (s *Service) CreateKeyStoreV3File(privateKey *ecdsa.PrivateKey, password string) (string, error) {
+	address := GetAddressFromPrivateKey(privateKey)
+
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Create keystore directory if it doesn't exist
+	keystoreDir := filepath.Join(homeDir, KeyStoreV3Dir)
+	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create keystore directory: %w", err)
+	}
+
+	// Create temporary keystore to generate the encrypted key
+	tempDir, err := os.MkdirTemp("", "blocowallet_temp")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create temporary keystore
+	tempKeystore := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
+
+	// Import the key to generate encrypted keystore file
+	account, err := tempKeystore.ImportECDSA(privateKey, password)
+	if err != nil {
+		return "", fmt.Errorf("failed to encrypt private key: %w", err)
+	}
+
+	// Read the generated keystore file
+	keystoreData, err := os.ReadFile(account.URL.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read keystore file: %w", err)
+	}
+
+	// Define the final keystore file path
+	fileName := fmt.Sprintf("%s.json", address)
+	finalPath := filepath.Join(keystoreDir, fileName)
+
+	// Write to final location
+	if err := os.WriteFile(finalPath, keystoreData, 0600); err != nil {
+		return "", fmt.Errorf("failed to write keystore file: %w", err)
+	}
+
+	return finalPath, nil
+}
+
+// LoadPrivateKeyFromKeyStoreV3 loads a private key from a KeyStore V3 file
+func (s *Service) LoadPrivateKeyFromKeyStoreV3(keystorePath, password string) (*ecdsa.PrivateKey, error) {
+	// Read keystore file
+	keystoreData, err := os.ReadFile(keystorePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read keystore file: %w", err)
+	}
+
+	// Use keystore.DecryptKey directly to decrypt the JSON keystore
+	key, err := keystore.DecryptKey(keystoreData, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt keystore with password: %w", err)
+	}
+
+	return key.PrivateKey, nil
+}
+
+// GetMnemonicFromWallet retrieves and decrypts the mnemonic for a wallet
+func (s *Service) GetMnemonicFromWallet(wallet *Wallet, password string) (string, error) {
+	if wallet.EncryptedMnemonic == "" {
+		return "", fmt.Errorf("wallet has no mnemonic (imported from private key)")
+	}
+
+	// Decrypt the mnemonic
+	mnemonic, err := DecryptMnemonic(wallet.EncryptedMnemonic, password)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt mnemonic: %w", err)
+	}
+
+	return mnemonic, nil
 }
 
 // GetAllWallets retrieves all wallets (alias for List for backward compatibility)
@@ -368,6 +598,13 @@ func (s *Service) DeleteWalletByAddress(ctx context.Context, address string) err
 	}
 
 	return nil
+}
+
+// RefreshMultiProvider updates the multi-provider with current network configuration
+func (s *Service) RefreshMultiProvider(cfg *config.Config) {
+	if s.multiProvider != nil {
+		s.multiProvider.RefreshProviders(cfg)
+	}
 }
 
 // GetMultiNetworkBalance gets the balance for a wallet across all active networks
@@ -428,4 +665,20 @@ func (s *Service) GetMultiNetworkBalance(ctx context.Context, address string) (*
 	}
 
 	return result, nil
+}
+
+// SetWalletPassword stores the password for a wallet address in memory
+func (s *Service) SetWalletPassword(address, password string) {
+	s.passwordCache[address] = password
+}
+
+// GetWalletPassword retrieves the cached password for a wallet address
+func (s *Service) GetWalletPassword(address string) (string, bool) {
+	password, exists := s.passwordCache[address]
+	return password, exists
+}
+
+// ClearWalletPassword removes the cached password for a wallet address
+func (s *Service) ClearWalletPassword(address string) {
+	delete(s.passwordCache, address)
 }

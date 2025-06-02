@@ -312,3 +312,43 @@ func (c *Config) UpdateNetwork(key string, network Network) error {
 
 	return fmt.Errorf("network with key %s not found", key)
 }
+
+// ToggleNetworkActive toggles the active status of a network without affecting others
+func (c *Config) ToggleNetworkActive(networkKey string) error {
+	// Check in regular networks
+	if network, exists := c.Networks[networkKey]; exists {
+		network.IsActive = !network.IsActive
+		c.Networks[networkKey] = network
+		return nil
+	}
+
+	// Check in custom networks
+	if network, exists := c.CustomNetworks[networkKey]; exists {
+		network.IsActive = !network.IsActive
+		c.CustomNetworks[networkKey] = network
+		return nil
+	}
+
+	return fmt.Errorf("network %s not found", networkKey)
+}
+
+// GetActiveNetworks returns all active networks
+func (c *Config) GetActiveNetworks() map[string]Network {
+	activeNetworks := make(map[string]Network)
+
+	// Add active regular networks
+	for key, network := range c.Networks {
+		if network.IsActive {
+			activeNetworks[key] = network
+		}
+	}
+
+	// Add active custom networks
+	for key, network := range c.CustomNetworks {
+		if network.IsActive {
+			activeNetworks[key] = network
+		}
+	}
+
+	return activeNetworks
+}

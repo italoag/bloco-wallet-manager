@@ -96,7 +96,7 @@ func (m Model) renderNetworkConfig() string {
 		if m.networkSelected < len(networkKeys) {
 			key := networkKeys[m.networkSelected]
 			if network, exists := m.config.GetNetworkByKey(key); exists {
-				helpText := "↑/↓: Navigate • Enter: Details • A: Activate • E: Edit RPC"
+				helpText := "↑/↓: Navigate • Enter: Details • A: Toggle Active • E: Edit RPC"
 				if network.IsCustom {
 					helpText += " • D: Delete"
 				}
@@ -184,6 +184,47 @@ func (m Model) renderAddNetwork() string {
 	b.WriteString(nameStyle.Render(nameLabel))
 	b.WriteString("\n")
 	b.WriteString(m.networkNameInput.View())
+
+	// Show network suggestions if available
+	if m.showingSuggestions && len(m.networkSuggestions) > 0 && m.addNetworkFocus == 0 {
+		suggestionStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("244")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1).
+			MarginTop(1)
+
+		selectedSuggestionStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("15")). // White text
+			Background(lipgloss.Color("86")). // Green background
+			Padding(0, 1).
+			Bold(true)
+
+		b.WriteString("\n")
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("86")).
+			Bold(true).
+			Render("📡 Suggestions (Press Enter to select):"))
+		b.WriteString("\n")
+
+		for i, suggestion := range m.networkSuggestions {
+			style := suggestionStyle
+			prefix := "  "
+			if i == m.selectedSuggestion {
+				style = selectedSuggestionStyle
+				prefix = "▶ " // Arrow indicator for selected item
+			}
+
+			suggestionText := fmt.Sprintf("%s%s (Chain ID: %d, Symbol: %s)",
+				prefix, suggestion.Name, suggestion.ChainID, suggestion.Symbol)
+			b.WriteString(style.Render(suggestionText))
+			b.WriteString("\n")
+		}
+
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Render("↑/↓: Navigate suggestions • Enter: Select • Esc: Close"))
+	}
+
 	b.WriteString("\n\n")
 
 	// Chain ID input
@@ -198,7 +239,7 @@ func (m Model) renderAddNetwork() string {
 	b.WriteString("\n\n")
 
 	// RPC Endpoint input
-	rpcLabel := "RPC Endpoint:"
+	rpcLabel := "RPC Endpoint (optional - auto-filled from ChainList):"
 	rpcStyle := inputStyle
 	if m.addNetworkFocus == 2 {
 		rpcStyle = focusedStyle
@@ -209,7 +250,7 @@ func (m Model) renderAddNetwork() string {
 	b.WriteString("\n\n")
 
 	if m.addingNetwork {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Render("⏳ Adding network and fetching symbol..."))
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Render("⏳ Adding network and finding best RPC endpoint..."))
 		b.WriteString("\n\n")
 	}
 
@@ -218,7 +259,16 @@ func (m Model) renderAddNetwork() string {
 		b.WriteString("\n\n")
 	}
 
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Tab: Next Field • Enter: Add Network • Esc: Cancel"))
+	// Instructions
+	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	if m.showingSuggestions && m.addNetworkFocus == 0 {
+		b.WriteString(instructionStyle.Render("↑/↓: Navigate suggestions • Enter: Select • Esc: Close suggestions"))
+	} else {
+		b.WriteString(instructionStyle.Render("Tab: Next Field • Enter: Add Network • Esc: Cancel"))
+		b.WriteString("\n")
+		b.WriteString(instructionStyle.Render("💡 Tip: Type network name for suggestions or enter Chain ID for auto-completion"))
+	}
 
 	return b.String()
 }
@@ -285,7 +335,7 @@ func (m Model) renderNetworkDetails() string {
 		b.WriteString("\n\n")
 	}
 
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("A: Activate • E: Edit • D: Delete (Custom only) • Esc: Back"))
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("A: Toggle Active • E: Edit • D: Delete (Custom only) • Esc: Back"))
 
 	return b.String()
 }

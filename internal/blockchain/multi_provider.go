@@ -198,13 +198,20 @@ func (mp *MultiProvider) RefreshProviders(cfg *config.Config) {
 
 	// Remove providers for networks that no longer exist or are inactive
 	for key, provider := range mp.providers {
-		if needed, exists := stillNeeded[key]; !exists || !needed || !mp.networks[key].IsActive {
-			// If the provider implements Close method, call it
+		if needed, exists := stillNeeded[key]; !exists || !needed {
+			// Remove provider if network no longer exists
 			if closer, ok := provider.balanceProvider.(interface{ Close() }); ok {
 				closer.Close()
 			}
 			delete(mp.providers, key)
 			delete(mp.networks, key)
+		} else {
+			// Update network status in cached networks
+			if network, exists := cfg.Networks[key]; exists {
+				mp.networks[key] = network
+			} else if network, exists := cfg.CustomNetworks[key]; exists {
+				mp.networks[key] = network
+			}
 		}
 	}
 }
