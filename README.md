@@ -1,4 +1,4 @@
-# BLOCO Wallet Manager
+<!--suppress HtmlDeprecatedAttribute -->
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -102,7 +102,6 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes with clear messages.
 4. Submit a pull request detailing your changes.
 
-For more information, refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## License
 This project is licensed under the [MIT License](LICENSE).

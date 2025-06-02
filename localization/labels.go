@@ -2,10 +2,9 @@ package localization
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
-
-	"gopkg.in/yaml.v2"
 )
 
 var Labels map[string]string

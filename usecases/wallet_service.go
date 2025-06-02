@@ -1,18 +1,16 @@
 package usecases
 
 import (
+	"blocowallet/domain"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-	"os"
-	"path/filepath"
-
-	"blocowallet/domain"
-
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
+	"os"
+	"path/filepath"
 )
 
 type WalletDetails struct {
@@ -123,6 +121,70 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 		return nil, err
 	}
 
+	walletDetails := &WalletDetails{
+		Wallet:     wallet,
+		Mnemonic:   mnemonic,
+		PrivateKey: privKey,
+		PublicKey:  &privKey.PublicKey,
+	}
+
+	return walletDetails, nil
+}
+
+func (ws *WalletService) ImportWalletFromPrivateKey(privateKeyHex, password string) (*WalletDetails, error) {
+	// Remove "0x" prefix if present
+	if len(privateKeyHex) > 2 && privateKeyHex[:2] == "0x" {
+		privateKeyHex = privateKeyHex[2:]
+	}
+
+	// Validate private key format
+	if len(privateKeyHex) != 64 {
+		return nil, fmt.Errorf("invalid private key format")
+	}
+
+	// Convert hex to ECDSA private key
+	privKey, err := HexToECDSA(privateKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid private key: %v", err)
+	}
+
+	// Generate a mnemonic from private key
+	privateKeyBytes, _ := hex.DecodeString(privateKeyHex)
+	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
+	mnemonic, err := bip39.NewMnemonic(entropy)
+	if err != nil {
+		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+	}
+
+	// Import the private key to keystore
+	account, err := ws.KeyStore.ImportECDSA(privKey, password)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rename the keystore file to match Ethereum address
+	originalPath := account.URL.Path
+	newFilename := fmt.Sprintf("%s.json", account.Address.Hex())
+	newPath := filepath.Join(filepath.Dir(originalPath), newFilename)
+	err = os.Rename(originalPath, newPath)
+	if err != nil {
+		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
+	}
+
+	// Create the wallet entry with the generated mnemonic
+	wallet := &domain.Wallet{
+		Address:      account.Address.Hex(),
+		KeyStorePath: newPath,
+		Mnemonic:     mnemonic, // Store the generated mnemonic
+	}
+
+	// Add wallet to repository
+	err = ws.Repo.AddWallet(wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return wallet details with the generated mnemonic
 	walletDetails := &WalletDetails{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
