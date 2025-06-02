@@ -84,13 +84,14 @@ var SupportedLanguages = map[string]string{
 }
 
 func DefaultConfig() *Config {
+	homeDir, _ := os.UserHomeDir()
 	return &Config{
 		Language:       "en",
 		Networks:       DefaultNetworks,
 		CustomNetworks: make(map[string]Network),
 		Database: DatabaseConfig{
 			Type: "sqlite",
-			Path: "wallets.db",
+			Path: filepath.Join(homeDir, ".blocowallet", "wallets.db"),
 		},
 		UIConfig: UIConfig{
 			Theme:      "default",

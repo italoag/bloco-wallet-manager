@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"blocowallet/internal/blockchain"
@@ -53,6 +54,7 @@ type Service struct {
 	multiProvider   *blockchain.MultiProvider
 	keystore        *keystore.KeyStore
 	passwordCache   map[string]string // Cache for wallet passwords
+	passwordMutex   sync.RWMutex      // Mutex for thread-safe password cache access
 }
 
 // NewService creates a new wallet service
@@ -486,6 +488,10 @@ func (s *Service) ExtractPrivateKeyFromKeystore(keystorePath, password string) (
 
 // CreateKeyStoreV3File creates a KeyStore V3 file in the proper directory structure
 func (s *Service) CreateKeyStoreV3File(privateKey *ecdsa.PrivateKey, password string) (string, error) {
+	if password == "" {
+		return "", fmt.Errorf("password cannot be empty")
+	}
+
 	address := GetAddressFromPrivateKey(privateKey)
 
 	// Get home directory
@@ -669,16 +675,22 @@ func (s *Service) GetMultiNetworkBalance(ctx context.Context, address string) (*
 
 // SetWalletPassword stores the password for a wallet address in memory
 func (s *Service) SetWalletPassword(address, password string) {
+	s.passwordMutex.Lock()
+	defer s.passwordMutex.Unlock()
 	s.passwordCache[address] = password
 }
 
 // GetWalletPassword retrieves the cached password for a wallet address
 func (s *Service) GetWalletPassword(address string) (string, bool) {
+	s.passwordMutex.RLock()
+	defer s.passwordMutex.RUnlock()
 	password, exists := s.passwordCache[address]
 	return password, exists
 }
 
 // ClearWalletPassword removes the cached password for a wallet address
 func (s *Service) ClearWalletPassword(address string) {
+	s.passwordMutex.Lock()
+	defer s.passwordMutex.Unlock()
 	delete(s.passwordCache, address)
 }

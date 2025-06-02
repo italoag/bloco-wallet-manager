@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 )
 
@@ -42,6 +44,275 @@ func TestSaltGeneration(t *testing.T) {
 	// Different encryptions should produce different results due to random salt
 	if encrypted1 == encrypted2 {
 		t.Fatal("Encrypted results should be different due to random salt")
+	}
+}
+
+// TestPasswordSecurity tests various password scenarios
+func TestPasswordSecurity(t *testing.T) {
+	testCases := []struct {
+		name        string
+		password    string
+		shouldError bool
+	}{
+		{"Empty password", "", true},
+		{"Single character", "a", false},
+		{"Normal password", "password123", false},
+		{"Long password", strings.Repeat("x", 1000), false},
+		{"Unicode password", "пароль123", false},
+		{"Special characters", "!@#$%^&*()", false},
+		{"Spaces in password", "pass word 123", false},
+		{"Only numbers", "123456789", false},
+		{"Mixed case", "PassWord123", false},
+	}
+
+	mnemonic := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			encrypted, err := EncryptMnemonic(mnemonic, tc.password)
+			if tc.shouldError {
+				if err == nil {
+					t.Fatal("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Test decryption
+			decrypted, err := DecryptMnemonic(encrypted, tc.password)
+			if err != nil {
+				t.Fatalf("Failed to decrypt: %v", err)
+			}
+
+			if decrypted != mnemonic {
+				t.Fatalf("Decrypted mnemonic doesn't match. Expected %q, got %q", mnemonic, decrypted)
+			}
+		})
+	}
+}
+
+// TestMnemonicSecurity tests various mnemonic scenarios
+func TestMnemonicSecurity(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mnemonic string
+	}{
+		{"Empty mnemonic", ""},
+		{"Single word", "abandon"},
+		{"Standard 12 word", "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"},
+		{"Standard 24 word", "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"},
+		{"Unicode mnemonic", "тест слово пароль"},
+		{"Special characters", "test!@#$ word%^&*"},
+		{"Very long mnemonic", strings.Repeat("word ", 100)},
+		{"Newlines and tabs", "word1\nword2\tword3"},
+		{"Mixed case", "Abandon Abandon ABANDON"},
+	}
+
+	password := "testpassword123"
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			encrypted, err := EncryptMnemonic(tc.mnemonic, password)
+			if err != nil {
+				t.Fatalf("Failed to encrypt: %v", err)
+			}
+
+			decrypted, err := DecryptMnemonic(encrypted, password)
+			if err != nil {
+				t.Fatalf("Failed to decrypt: %v", err)
+			}
+
+			if decrypted != tc.mnemonic {
+				t.Fatalf("Decrypted mnemonic doesn't match. Expected %q, got %q", tc.mnemonic, decrypted)
+			}
+		})
+	}
+}
+
+// TestWrongPasswordDetection tests that wrong passwords are properly detected
+func TestWrongPasswordDetection(t *testing.T) {
+	mnemonic := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	correctPassword := "correct_password"
+	wrongPassword := "wrong_password"
+
+	encrypted, err := EncryptMnemonic(mnemonic, correctPassword)
+	if err != nil {
+		t.Fatalf("Failed to encrypt: %v", err)
+	}
+
+	// Test with wrong password
+	_, err = DecryptMnemonic(encrypted, wrongPassword)
+	if err == nil {
+		t.Fatal("Expected error with wrong password but got none")
+	}
+
+	if !strings.Contains(err.Error(), "hash verification failed") {
+		t.Fatalf("Expected hash verification error, got: %v", err)
+	}
+
+	// Test with correct password should work
+	decrypted, err := DecryptMnemonic(encrypted, correctPassword)
+	if err != nil {
+		t.Fatalf("Failed to decrypt with correct password: %v", err)
+	}
+
+	if decrypted != mnemonic {
+		t.Fatalf("Decrypted mnemonic doesn't match")
+	}
+}
+
+// TestEncryptionFormat tests the format of encrypted data
+func TestEncryptionFormat(t *testing.T) {
+	mnemonic := "test mnemonic"
+	password := "password"
+
+	encrypted, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		t.Fatalf("Failed to encrypt: %v", err)
+	}
+
+	// Should be valid base64
+	decoded, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		t.Fatalf("Encrypted data is not valid base64: %v", err)
+	}
+
+	// Should have minimum length: salt(16) + hash(32) + at least some encrypted data
+	expectedMinLength := saltLength + hashLength
+	if len(decoded) < expectedMinLength {
+		t.Fatalf("Encrypted data too short. Expected at least %d bytes, got %d", expectedMinLength, len(decoded))
+	}
+
+	// Verify structure: first 16 bytes should be salt, next 32 should be hash
+	if len(decoded) < saltLength+hashLength {
+		t.Fatal("Decoded data doesn't contain salt and hash")
+	}
+}
+
+// TestConcurrentEncryption tests thread safety
+func TestConcurrentEncryption(t *testing.T) {
+	mnemonic := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	password := "password123"
+
+	// Run multiple encryptions concurrently
+	results := make(chan string, 10)
+	errors := make(chan error, 10)
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			encrypted, err := EncryptMnemonic(mnemonic, password)
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- encrypted
+		}()
+	}
+
+	// Collect results
+	var encryptedResults []string
+	for i := 0; i < 10; i++ {
+		select {
+		case encrypted := <-results:
+			encryptedResults = append(encryptedResults, encrypted)
+		case err := <-errors:
+			t.Fatalf("Concurrent encryption failed: %v", err)
+		}
+	}
+
+	// All results should be different (due to random salt)
+	seen := make(map[string]bool)
+	for _, encrypted := range encryptedResults {
+		if seen[encrypted] {
+			t.Fatal("Found duplicate encrypted result - salt randomization failed")
+		}
+		seen[encrypted] = true
+
+		// Each should decrypt correctly
+		decrypted, err := DecryptMnemonic(encrypted, password)
+		if err != nil {
+			t.Fatalf("Failed to decrypt concurrent result: %v", err)
+		}
+		if decrypted != mnemonic {
+			t.Fatal("Concurrent decryption produced wrong result")
+		}
+	}
+}
+
+// TestLargeDataHandling tests encryption with very large mnemonics
+func TestLargeDataHandling(t *testing.T) {
+	// Create a very large mnemonic
+	largeMnemonic := strings.Repeat("word ", 10000) // ~50KB of data
+	password := "password"
+
+	encrypted, err := EncryptMnemonic(largeMnemonic, password)
+	if err != nil {
+		t.Fatalf("Failed to encrypt large mnemonic: %v", err)
+	}
+
+	decrypted, err := DecryptMnemonic(encrypted, password)
+	if err != nil {
+		t.Fatalf("Failed to decrypt large mnemonic: %v", err)
+	}
+
+	if decrypted != largeMnemonic {
+		t.Fatal("Large mnemonic decryption failed")
+	}
+}
+
+// TestSecureCompare tests the constant-time comparison function
+func TestSecureCompare(t *testing.T) {
+	testCases := []struct {
+		name     string
+		a, b     string
+		expected bool
+	}{
+		{"Equal strings", "test", "test", true},
+		{"Different strings", "test", "best", false},
+		{"Empty strings", "", "", true},
+		{"One empty", "test", "", false},
+		{"Different lengths", "short", "verylongstring", false},
+		{"Unicode equal", "тест", "тест", true},
+		{"Unicode different", "тест", "лест", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := SecureCompare(tc.a, tc.b)
+			if result != tc.expected {
+				t.Fatalf("Expected %v, got %v for comparing %q and %q", tc.expected, result, tc.a, tc.b)
+			}
+		})
+	}
+}
+
+// TestVerifyMnemonicPassword tests password verification
+func TestVerifyMnemonicPassword(t *testing.T) {
+	mnemonic := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	correctPassword := "correct123"
+	wrongPassword := "wrong123"
+
+	encrypted, err := EncryptMnemonic(mnemonic, correctPassword)
+	if err != nil {
+		t.Fatalf("Failed to encrypt: %v", err)
+	}
+
+	// Test correct password
+	if !VerifyMnemonicPassword(encrypted, correctPassword) {
+		t.Fatal("VerifyMnemonicPassword should return true for correct password")
+	}
+
+	// Test wrong password
+	if VerifyMnemonicPassword(encrypted, wrongPassword) {
+		t.Fatal("VerifyMnemonicPassword should return false for wrong password")
+	}
+
+	// Test with invalid encrypted data
+	if VerifyMnemonicPassword("invalid", correctPassword) {
+		t.Fatal("VerifyMnemonicPassword should return false for invalid encrypted data")
 	}
 }
 

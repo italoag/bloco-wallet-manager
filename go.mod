@@ -13,6 +13,7 @@ require (
 	github.com/tyler-smith/go-bip32 v1.0.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.38.0
 )
 
 require (
@@ -59,7 +60,6 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect

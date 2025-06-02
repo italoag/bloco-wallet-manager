@@ -55,51 +55,6 @@ func (s *SQLite) createTables() error {
 		return fmt.Errorf("failed to create wallets table: %w", err)
 	}
 
-	// Add migration for encrypted_mnemonic column if it doesn't exist
-	if err := s.addEncryptedMnemonicColumn(); err != nil {
-		return fmt.Errorf("failed to migrate wallets table: %w", err)
-	}
-
-	return nil
-}
-
-// addEncryptedMnemonicColumn adds the encrypted_mnemonic column if it doesn't exist
-func (s *SQLite) addEncryptedMnemonicColumn() error {
-	// Check if column exists
-	query := `PRAGMA table_info(wallets);`
-	rows, err := s.db.Query(query)
-	if err != nil {
-		return fmt.Errorf("failed to get table info: %w", err)
-	}
-	defer rows.Close()
-
-	hasEncryptedMnemonic := false
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull, pk int
-		var dfltValue interface{}
-		
-		err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk)
-		if err != nil {
-			return fmt.Errorf("failed to scan column info: %w", err)
-		}
-		
-		if name == "encrypted_mnemonic" {
-			hasEncryptedMnemonic = true
-			break
-		}
-	}
-
-	// Add column if it doesn't exist
-	if !hasEncryptedMnemonic {
-		alterQuery := `ALTER TABLE wallets ADD COLUMN encrypted_mnemonic TEXT;`
-		_, err := s.db.Exec(alterQuery)
-		if err != nil {
-			return fmt.Errorf("failed to add encrypted_mnemonic column: %w", err)
-		}
-	}
-
 	return nil
 }
 

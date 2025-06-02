@@ -1025,14 +1025,7 @@ func (m Model) renderWalletDetails() string {
 		m.selectedWallet.Address,
 		m.selectedWallet.CreatedAt.Format("2006-01-02 15:04:05"))
 
-	// Debug information
-	debugInfo := fmt.Sprintf("\nDebug Info:\n- Has Encrypted Mnemonic: %t\n- Has KeyStore: %t\n- KeyStore Path: %s",
-		m.selectedWallet.EncryptedMnemonic != "",
-		m.selectedWallet.KeyStorePath != "",
-		m.selectedWallet.KeyStorePath)
-
 	b.WriteString(info)
-	b.WriteString(debugInfo)
 	b.WriteString("\n\n")
 
 	// Add sensitive information section

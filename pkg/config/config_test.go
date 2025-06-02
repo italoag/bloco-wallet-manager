@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -81,7 +82,7 @@ func TestConfigSaveAndLoad(t *testing.T) {
 		},
 		Database: DatabaseConfig{
 			Type: "sqlite",
-			Path: "test.db",
+			Path: filepath.Join(tempDir, "test.db"),
 		},
 		UIConfig: UIConfig{
 			Theme:      "dark",
