@@ -11,7 +11,7 @@ import (
 )
 
 // handleInputNavigation handles navigation between input fields
-func (m Model) handleInputNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleInputNavigation(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab", "down":
 		m.inputFocus = (m.inputFocus + 1) % 3
@@ -35,7 +35,7 @@ func (m Model) handleInputNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleInputSubmit handles form submission in input views
-func (m Model) handleInputSubmit() (tea.Model, tea.Cmd) {
+func (m Model) handleInputSubmit() (Model, tea.Cmd) {
 	if m.currentView == CreateWalletView {
 		name := strings.TrimSpace(m.nameInput.Value())
 		password := strings.TrimSpace(m.passwordInput.Value())
@@ -108,7 +108,7 @@ func (m Model) handleInputSubmit() (tea.Model, tea.Cmd) {
 }
 
 // handleEnterKey handles the enter key press for navigation
-func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
+func (m Model) handleEnterKey() (Model, tea.Cmd) {
 	switch m.currentView {
 	case SplashView:
 		m.currentView = MenuView
@@ -232,7 +232,7 @@ func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
 }
 
 // saveRPCEndpoint saves the edited RPC endpoint
-func (m Model) saveRPCEndpoint() (tea.Model, tea.Cmd) {
+func (m Model) saveRPCEndpoint() (Model, tea.Cmd) {
 	networkKeys := m.config.GetAllNetworkKeys()
 	if m.networkSelected < len(networkKeys) {
 		key := networkKeys[m.networkSelected]
@@ -253,7 +253,7 @@ func (m Model) saveRPCEndpoint() (tea.Model, tea.Cmd) {
 }
 
 // saveLanguageChange saves the language change and updates UI
-func (m Model) saveLanguageChange() (tea.Model, tea.Cmd) {
+func (m Model) saveLanguageChange() (Model, tea.Cmd) {
 	// Save configuration to file
 	if err := m.config.Save(); err != nil {
 		m.err = err
@@ -341,7 +341,7 @@ func (m *Model) resetInputs() {
 }
 
 // handleAddNetworkNavigation handles navigation in add network view
-func (m Model) handleAddNetworkNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAddNetworkNavigation(msg tea.KeyMsg) (Model, tea.Cmd) {
 	// If showing suggestions, handle suggestion navigation
 	if m.showingSuggestions && m.addNetworkFocus == 0 { // Only when on network name field
 		switch msg.String() {
@@ -426,7 +426,7 @@ func (m *Model) resetAddNetworkInputs() {
 }
 
 // handleAddNetworkSubmit handles the submission of add network form
-func (m Model) handleAddNetworkSubmit() (tea.Model, tea.Cmd) {
+func (m Model) handleAddNetworkSubmit() (Model, tea.Cmd) {
 	name := strings.TrimSpace(m.networkNameInput.Value())
 	chainIDStr := strings.TrimSpace(m.chainIDInput.Value())
 	rpcEndpoint := strings.TrimSpace(m.rpcEndpointInput.Value())

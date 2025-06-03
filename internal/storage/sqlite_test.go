@@ -8,7 +8,18 @@ import (
 	"time"
 
 	"blocowallet/internal/wallet"
+
+	"go.uber.org/zap"
 )
+
+// MockLogger implements logger.Logger interface for testing
+type MockLogger struct{}
+
+func (m *MockLogger) Info(msg string, fields ...zap.Field)  {}
+func (m *MockLogger) Error(msg string, fields ...zap.Field) {}
+func (m *MockLogger) Debug(msg string, fields ...zap.Field) {}
+func (m *MockLogger) Warn(msg string, fields ...zap.Field)  {}
+func (m *MockLogger) Sync() error                          { return nil }
 
 func TestSQLiteCreateAndGet(t *testing.T) {
 	// Create temporary database file
@@ -19,7 +30,7 @@ func TestSQLiteCreateAndGet(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := NewSQLite(dbPath)
+	db, err := NewSQLite(dbPath, &MockLogger{})
 	if err != nil {
 		t.Fatalf("Failed to create SQLite instance: %v", err)
 	}
@@ -87,7 +98,7 @@ func TestSQLiteList(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := NewSQLite(dbPath)
+	db, err := NewSQLite(dbPath, &MockLogger{})
 	if err != nil {
 		t.Fatalf("Failed to create SQLite instance: %v", err)
 	}
@@ -162,7 +173,7 @@ func TestSQLiteUpdate(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := NewSQLite(dbPath)
+	db, err := NewSQLite(dbPath, &MockLogger{})
 	if err != nil {
 		t.Fatalf("Failed to create SQLite instance: %v", err)
 	}
@@ -220,7 +231,7 @@ func TestSQLiteDelete(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := NewSQLite(dbPath)
+	db, err := NewSQLite(dbPath, &MockLogger{})
 	if err != nil {
 		t.Fatalf("Failed to create SQLite instance: %v", err)
 	}
@@ -273,7 +284,7 @@ func TestSQLiteWithEmptyEncryptedMnemonic(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := NewSQLite(dbPath)
+	db, err := NewSQLite(dbPath, &MockLogger{})
 	if err != nil {
 		t.Fatalf("Failed to create SQLite instance: %v", err)
 	}

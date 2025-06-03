@@ -12,6 +12,7 @@ import (
 
 	"blocowallet/internal/blockchain"
 	"blocowallet/pkg/config"
+	"blocowallet/pkg/logger"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -55,60 +56,90 @@ type Service struct {
 	keystore        *keystore.KeyStore
 	passwordCache   map[string]string // Cache for wallet passwords
 	passwordMutex   sync.RWMutex      // Mutex for thread-safe password cache access
+	logger          logger.Logger     // Logger for structured logging
 }
 
 // NewService creates a new wallet service
-func NewService(repo Repository, balanceProvider BalanceProvider) *Service {
+func NewService(repo Repository, balanceProvider BalanceProvider, log logger.Logger) *Service {
 	return &Service{
 		repo:            repo,
 		balanceProvider: balanceProvider,
 		passwordCache:   make(map[string]string),
+		logger:          log,
 	}
 }
 
 // NewServiceWithMultiProvider creates a new wallet service with multi-provider support
-func NewServiceWithMultiProvider(repo Repository, multiProvider *blockchain.MultiProvider) *Service {
+func NewServiceWithMultiProvider(repo Repository, multiProvider *blockchain.MultiProvider, log logger.Logger) *Service {
 	return &Service{
 		repo:          repo,
 		multiProvider: multiProvider,
 		passwordCache: make(map[string]string),
+		logger:        log,
 	}
 }
 
 // NewServiceWithKeystore creates a new wallet service with keystore support
-func NewServiceWithKeystore(repo Repository, balanceProvider BalanceProvider, ks *keystore.KeyStore) *Service {
+func NewServiceWithKeystore(repo Repository, balanceProvider BalanceProvider, ks *keystore.KeyStore, log logger.Logger) *Service {
 	return &Service{
 		repo:            repo,
 		balanceProvider: balanceProvider,
 		keystore:        ks,
 		passwordCache:   make(map[string]string),
+		logger:          log,
 	}
 }
 
 // NewServiceWithMultiProviderAndKeystore creates a new wallet service with multi-provider and keystore support
-func NewServiceWithMultiProviderAndKeystore(repo Repository, multiProvider *blockchain.MultiProvider, ks *keystore.KeyStore) *Service {
+func NewServiceWithMultiProviderAndKeystore(repo Repository, multiProvider *blockchain.MultiProvider, ks *keystore.KeyStore, log logger.Logger) *Service {
 	return &Service{
 		repo:          repo,
 		multiProvider: multiProvider,
 		keystore:      ks,
 		passwordCache: make(map[string]string),
+		logger:        log,
 	}
 }
 
 // Create creates a new wallet
 func (s *Service) Create(ctx context.Context, name, address, keystorePath string) (*Wallet, error) {
+	correlationID := uuid.New().String()
+	ctx = context.WithValue(ctx, "correlation_id", correlationID)
+
+	s.logger.Info("Creating new wallet",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_name", name),
+		logger.String("address", address),
+		logger.String("operation", "create_wallet"))
+
 	if name == "" {
-		return nil, fmt.Errorf("wallet name cannot be empty")
+		err := NewValidationError("wallet name cannot be empty")
+		s.logger.Error("Wallet creation failed",
+			logger.String("correlation_id", correlationID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	if address == "" {
-		return nil, fmt.Errorf("wallet address cannot be empty")
+		err := NewValidationError("wallet address cannot be empty")
+		s.logger.Error("Wallet creation failed",
+			logger.String("correlation_id", correlationID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	// Check if wallet with this address already exists
 	existing, err := s.repo.GetByAddress(ctx, address)
 	if err == nil && existing != nil {
-		return nil, fmt.Errorf("wallet with address %s already exists", address)
+		err := NewAlreadyExistsError(fmt.Sprintf("wallet with address %s already exists", address))
+		s.logger.Error("Wallet creation failed - already exists",
+			logger.String("correlation_id", correlationID),
+			logger.String("address", address),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	wallet := &Wallet{
@@ -121,22 +152,56 @@ func (s *Service) Create(ctx context.Context, name, address, keystorePath string
 	}
 
 	if err := s.repo.Create(ctx, wallet); err != nil {
-		return nil, fmt.Errorf("failed to create wallet: %w", err)
+		s.logger.Error("Failed to save wallet to database",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", wallet.ID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet"))
+		return nil, AddCorrelationID(ctx, NewStorageError("failed to create wallet", err))
 	}
+
+	s.logger.Info("Wallet created successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", wallet.ID),
+		logger.String("address", wallet.Address),
+		logger.String("operation", "create_wallet"))
 
 	return wallet, nil
 }
 
 // GetByID retrieves a wallet by ID
 func (s *Service) GetByID(ctx context.Context, id string) (*Wallet, error) {
+	correlationID := uuid.New().String()
+	ctx = context.WithValue(ctx, "correlation_id", correlationID)
+
+	s.logger.Debug("Getting wallet by ID",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", id),
+		logger.String("operation", "get_wallet_by_id"))
+
 	if id == "" {
-		return nil, fmt.Errorf("wallet ID cannot be empty")
+		err := NewValidationError("wallet ID cannot be empty")
+		s.logger.Error("Get wallet failed",
+			logger.String("correlation_id", correlationID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "get_wallet_by_id"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	wallet, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get wallet: %w", err)
+		s.logger.Error("Failed to retrieve wallet from database",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", id),
+			logger.Error(err),
+			logger.String("operation", "get_wallet_by_id"))
+		return nil, AddCorrelationID(ctx, NewStorageError("failed to get wallet", err))
 	}
+
+	s.logger.Debug("Wallet retrieved successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", id),
+		logger.String("operation", "get_wallet_by_id"))
 
 	return wallet, nil
 }
@@ -219,44 +284,106 @@ func (s *Service) GetBalance(ctx context.Context, address string) (*Balance, err
 
 // CreateWalletWithMnemonic creates a new wallet with mnemonic and keystore
 func (s *Service) CreateWalletWithMnemonic(ctx context.Context, name, password string) (*WalletDetails, error) {
+	correlationID := uuid.New().String()
+	ctx = context.WithValue(ctx, "correlation_id", correlationID)
+
+	s.logger.Info("Creating wallet with mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_name", name),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	if name == "" {
-		return nil, fmt.Errorf("wallet name cannot be empty")
+		err := NewValidationError("wallet name cannot be empty")
+		s.logger.Error("Wallet creation failed - empty name",
+			logger.String("correlation_id", correlationID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	if password == "" {
-		return nil, fmt.Errorf("password cannot be empty")
+		err := NewValidationError("password cannot be empty")
+		s.logger.Error("Wallet creation failed - empty password",
+			logger.String("correlation_id", correlationID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, err)
 	}
 
 	// Generate mnemonic
+	s.logger.Debug("Generating mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	mnemonic, err := GenerateMnemonic()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate mnemonic: %w", err)
+		s.logger.Error("Failed to generate mnemonic",
+			logger.String("correlation_id", correlationID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, NewCryptoError("failed to generate mnemonic", err))
 	}
 
 	// Derive private key
+	s.logger.Debug("Deriving private key from mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	privateKeyHex, err := DerivePrivateKey(mnemonic)
 	if err != nil {
-		return nil, fmt.Errorf("failed to derive private key: %w", err)
+		s.logger.Error("Failed to derive private key",
+			logger.String("correlation_id", correlationID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, NewCryptoError("failed to derive private key", err))
 	}
 
 	privKey, err := HexToECDSA(privateKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert private key: %w", err)
+		s.logger.Error("Failed to convert private key",
+			logger.String("correlation_id", correlationID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, NewCryptoError("failed to convert private key", err))
 	}
 
 	// Get address
 	address := GetAddressFromPrivateKey(privKey)
+	s.logger.Debug("Generated wallet address",
+		logger.String("correlation_id", correlationID),
+		logger.String("address", address),
+		logger.String("operation", "create_wallet_with_mnemonic"))
 
 	// Create KeyStore V3 file in proper directory structure
+	s.logger.Debug("Creating keystore file",
+		logger.String("correlation_id", correlationID),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	keystorePath, err := s.CreateKeyStoreV3File(privKey, password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create keystore file: %w", err)
+		s.logger.Error("Failed to create keystore file",
+			logger.String("correlation_id", correlationID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, NewCryptoError("failed to create keystore file", err))
 	}
 
 	// Encrypt mnemonic for secure storage in database
+	s.logger.Debug("Encrypting mnemonic for storage",
+		logger.String("correlation_id", correlationID),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt mnemonic: %w", err)
+		s.logger.Error("Failed to encrypt mnemonic",
+			logger.String("correlation_id", correlationID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		// Cleanup keystore file on encryption failure
+		if keystorePath != "" {
+			os.Remove(keystorePath)
+		}
+		return nil, AddCorrelationID(ctx, NewCryptoError("failed to encrypt mnemonic", err))
 	}
 
 	// Create wallet entity - store encrypted mnemonic
@@ -271,20 +398,48 @@ func (s *Service) CreateWalletWithMnemonic(ctx context.Context, name, password s
 	}
 
 	// Save to repository
+	s.logger.Debug("Saving wallet to database",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", wallet.ID),
+		logger.String("operation", "create_wallet_with_mnemonic"))
+
 	if err := s.repo.Create(ctx, wallet); err != nil {
+		s.logger.Error("Failed to save wallet to database",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", wallet.ID),
+			logger.Error(err),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+
 		// If database save fails and keystore was created, try to clean up
 		if s.keystore != nil && keystorePath != "" {
 			os.Remove(keystorePath)
+			s.logger.Debug("Cleaned up keystore file after database failure",
+				logger.String("correlation_id", correlationID),
+				logger.String("keystore_path", keystorePath),
+				logger.String("operation", "create_wallet_with_mnemonic"))
 		}
-		return nil, fmt.Errorf("failed to save wallet: %w", err)
+		return nil, AddCorrelationID(ctx, NewStorageError("failed to save wallet", err))
 	}
 
 	// Get public key
 	publicKey := privKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("failed to get public key")
+		err := NewCryptoError("failed to get public key", fmt.Errorf("invalid public key type"))
+		s.logger.Error("Failed to extract public key",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", wallet.ID),
+			logger.String("error", err.Error()),
+			logger.String("operation", "create_wallet_with_mnemonic"))
+		return nil, AddCorrelationID(ctx, err)
 	}
+
+	s.logger.Info("Wallet created successfully with mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", wallet.ID),
+		logger.String("address", wallet.Address),
+		logger.String("keystore_path", keystorePath),
+		logger.String("operation", "create_wallet_with_mnemonic"))
 
 	return &WalletDetails{
 		Wallet:     wallet,

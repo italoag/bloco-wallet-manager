@@ -9,7 +9,17 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"go.uber.org/zap"
 )
+
+// MockLogger implements logger.Logger interface for testing
+type MockLogger struct{}
+
+func (m *MockLogger) Info(msg string, fields ...zap.Field)  {}
+func (m *MockLogger) Error(msg string, fields ...zap.Field) {}
+func (m *MockLogger) Debug(msg string, fields ...zap.Field) {}
+func (m *MockLogger) Warn(msg string, fields ...zap.Field)  {}
+func (m *MockLogger) Sync() error                          { return nil }
 
 // MockRepository implements Repository interface for testing
 type MockRepository struct {
@@ -92,7 +102,7 @@ func TestCreateKeyStoreV3File(t *testing.T) {
 	os.Setenv("HOME", tempDir)
 
 	// Create a service instance with mock repository
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	// Generate a test private key
 	privateKey, err := crypto.GenerateKey()
@@ -146,7 +156,7 @@ func TestCreateKeyStoreV3FilePasswordScenarios(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tempDir)
 
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -202,7 +212,7 @@ func TestLoadPrivateKeyFromKeyStoreV3WithWrongPassword(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tempDir)
 
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -232,7 +242,7 @@ func TestLoadPrivateKeyFromKeyStoreV3WithWrongPassword(t *testing.T) {
 
 // TestPasswordCache tests the password caching functionality
 func TestPasswordCache(t *testing.T) {
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	address := "0x742d35Cc6634C0532925a3b8D86CAE2e1aD84c3e"
 	password := "test_password"
@@ -264,7 +274,7 @@ func TestPasswordCache(t *testing.T) {
 
 // TestConcurrentPasswordCache tests thread safety of password cache
 func TestConcurrentPasswordCache(t *testing.T) {
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	// Run concurrent operations
 	done := make(chan bool)
@@ -305,7 +315,7 @@ func TestConcurrentPasswordCache(t *testing.T) {
 
 // TestWalletCRUDOperations tests basic CRUD operations
 func TestWalletCRUDOperations(t *testing.T) {
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 	ctx := context.Background()
 
 	// Create wallet
@@ -398,7 +408,7 @@ func TestCreateWalletWithMnemonic(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tempDir)
 
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 	ctx := context.Background()
 
 	name := "Mnemonic Wallet"
@@ -440,7 +450,7 @@ func TestImportWalletFromMnemonic(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tempDir)
 
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 	ctx := context.Background()
 
 	name := "Imported Wallet"
@@ -483,7 +493,7 @@ func TestImportWalletFromPrivateKey(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tempDir)
 
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 	ctx := context.Background()
 
 	// Generate a test private key
@@ -518,7 +528,7 @@ func TestImportWalletFromPrivateKey(t *testing.T) {
 
 // TestErrorHandling tests various error scenarios
 func TestErrorHandling(t *testing.T) {
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 	ctx := context.Background()
 
 	t.Run("Create wallet with empty name", func(t *testing.T) {
@@ -553,7 +563,7 @@ func TestErrorHandling(t *testing.T) {
 
 // TestGetMnemonicFromWalletErrors tests error scenarios for mnemonic retrieval
 func TestGetMnemonicFromWalletErrors(t *testing.T) {
-	service := NewService(NewMockRepository(), nil)
+	service := NewService(NewMockRepository(), nil, &MockLogger{})
 
 	t.Run("Wallet with no encrypted mnemonic", func(t *testing.T) {
 		wallet := &Wallet{

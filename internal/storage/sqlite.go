@@ -7,17 +7,20 @@ import (
 	"time"
 
 	"blocowallet/internal/wallet"
+	"blocowallet/pkg/logger"
 
+	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 // SQLite implements wallet.Repository using SQLite
 type SQLite struct {
-	db *sql.DB
+	db     *sql.DB
+	logger logger.Logger
 }
 
 // NewSQLite creates a new SQLite repository
-func NewSQLite(databasePath string) (*SQLite, error) {
+func NewSQLite(databasePath string, log logger.Logger) (*SQLite, error) {
 	db, err := sql.Open("sqlite3", databasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -27,11 +30,26 @@ func NewSQLite(databasePath string) (*SQLite, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	sqlite := &SQLite{db: db}
+	sqlite := &SQLite{
+		db:     db,
+		logger: log,
+	}
+
+	log.Info("Initializing SQLite database",
+		logger.String("database_path", databasePath),
+		logger.String("operation", "initialize_database"))
 
 	if err := sqlite.createTables(); err != nil {
+		log.Error("Failed to create database tables",
+			logger.Error(err),
+			logger.String("database_path", databasePath),
+			logger.String("operation", "initialize_database"))
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
+
+	log.Info("SQLite database initialized successfully",
+		logger.String("database_path", databasePath),
+		logger.String("operation", "initialize_database"))
 
 	return sqlite, nil
 }
@@ -60,6 +78,17 @@ func (s *SQLite) createTables() error {
 
 // Create creates a new wallet in the database
 func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
+	correlationID, _ := ctx.Value("correlation_id").(string)
+	if correlationID == "" {
+		correlationID = uuid.New().String()
+	}
+
+	s.logger.Debug("Creating wallet in database",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", w.ID),
+		logger.String("address", w.Address),
+		logger.String("operation", "db_create_wallet"))
+
 	query := `
 	INSERT INTO wallets (id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at)
 	VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -68,14 +97,34 @@ func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
 	_, err := s.db.ExecContext(ctx, query,
 		w.ID, w.Name, w.Address, w.KeyStorePath, w.EncryptedMnemonic, w.CreatedAt, w.UpdatedAt)
 	if err != nil {
+		s.logger.Error("Database wallet creation failed",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", w.ID),
+			logger.Error(err),
+			logger.String("operation", "db_create_wallet"))
 		return fmt.Errorf("failed to create wallet: %w", err)
 	}
+
+	s.logger.Info("Wallet saved to database successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", w.ID),
+		logger.String("operation", "db_create_wallet"))
 
 	return nil
 }
 
 // GetByID retrieves a wallet by ID
 func (s *SQLite) GetByID(ctx context.Context, id string) (*wallet.Wallet, error) {
+	correlationID, _ := ctx.Value("correlation_id").(string)
+	if correlationID == "" {
+		correlationID = uuid.New().String()
+	}
+
+	s.logger.Debug("Retrieving wallet by ID from database",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", id),
+		logger.String("operation", "db_get_wallet_by_id"))
+
 	query := `
 	SELECT id, name, address, keystore_path, encrypted_mnemonic, created_at, updated_at
 	FROM wallets WHERE id = ?
@@ -89,18 +138,42 @@ func (s *SQLite) GetByID(ctx context.Context, id string) (*wallet.Wallet, error)
 	err := row.Scan(&w.ID, &w.Name, &w.Address, &w.KeyStorePath, &w.EncryptedMnemonic, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			s.logger.Debug("Wallet not found in database",
+				logger.String("correlation_id", correlationID),
+				logger.String("wallet_id", id),
+				logger.String("operation", "db_get_wallet_by_id"))
 			return nil, fmt.Errorf("wallet not found")
 		}
+		s.logger.Error("Database scan failed",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", id),
+			logger.Error(err),
+			logger.String("operation", "db_get_wallet_by_id"))
 		return nil, fmt.Errorf("failed to scan wallet: %w", err)
 	}
 
 	if w.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+		s.logger.Error("Failed to parse created_at timestamp",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", id),
+			logger.Error(err),
+			logger.String("operation", "db_get_wallet_by_id"))
 		return nil, fmt.Errorf("failed to parse created_at: %w", err)
 	}
 
 	if w.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+		s.logger.Error("Failed to parse updated_at timestamp",
+			logger.String("correlation_id", correlationID),
+			logger.String("wallet_id", id),
+			logger.Error(err),
+			logger.String("operation", "db_get_wallet_by_id"))
 		return nil, fmt.Errorf("failed to parse updated_at: %w", err)
 	}
+
+	s.logger.Debug("Wallet retrieved from database successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", id),
+		logger.String("operation", "db_get_wallet_by_id"))
 
 	return &w, nil
 }
