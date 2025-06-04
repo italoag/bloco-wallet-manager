@@ -79,11 +79,11 @@ func (m DeleteWalletDialog) View() string {
 	var confirmButton, cancelButton string
 
 	if m.active == "confirm" {
-		confirmButton = activeButtonStyle.Render("Yes, Delete")
-		cancelButton = buttonStyle.Render("Cancel")
+		confirmButton = ActiveButtonStyle.Render("Yes, Delete")
+		cancelButton = ButtonStyle.Render("Cancel")
 	} else {
-		confirmButton = buttonStyle.Render("Yes, Delete")
-		cancelButton = activeButtonStyle.Render("Cancel")
+		confirmButton = ButtonStyle.Render("Yes, Delete")
+		cancelButton = ActiveButtonStyle.Render("Cancel")
 	}
 
 	// Criar a pergunta com o nome da wallet
@@ -91,24 +91,14 @@ func (m DeleteWalletDialog) View() string {
 		lipgloss.Center,
 		m.question,
 		"",
-		lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ff6b6b")).
-			Bold(true).
-			Render("\""+m.walletName+"\""),
+		WalletNameStyle.Render("\""+m.walletName+"\""),
 		"",
-		lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#8a8a8a")).
-			Render(m.address[:10]+"..."+m.address[len(m.address)-10:]),
+		AddressStyle.Render(m.address[:10]+"..."+m.address[len(m.address)-10:]),
 		"",
-		lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666666")).
-			Render("This action cannot be undone."),
+		WarningStyle.Render("This action cannot be undone."),
 	)
 
-	question := lipgloss.NewStyle().
-		Width(45).
-		Align(lipgloss.Center).
-		Render(questionText)
+	question := DialogQuestionStyle.Render(questionText)
 
 	buttons := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -117,7 +107,7 @@ func (m DeleteWalletDialog) View() string {
 		zone.Mark(m.id+"confirm", confirmButton),
 	)
 
-	return dialogBoxStyle.Render(
+	return DialogBoxStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Center,
 			question,
@@ -130,30 +120,3 @@ func (m DeleteWalletDialog) View() string {
 // Mensagens para comunicação
 type ConfirmDeleteMsg struct{}
 type CancelDeleteMsg struct{}
-
-// Estilos
-var (
-	dialogBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#874BFD")).
-			Padding(2, 3).
-			Background(lipgloss.Color("#1a1a1a")).
-			Foreground(lipgloss.Color("#ffffff")).
-			MarginTop(2).
-			MarginBottom(2)
-
-	buttonStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFF")).
-			Background(lipgloss.Color("#666")).
-			Padding(0, 3).
-			Margin(0, 1).
-			Border(lipgloss.RoundedBorder())
-
-	activeButtonStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FFF")).
-				Background(lipgloss.Color("#874BFD")).
-				Padding(0, 3).
-				Margin(0, 1).
-				Bold(true).
-				Border(lipgloss.RoundedBorder())
-)
