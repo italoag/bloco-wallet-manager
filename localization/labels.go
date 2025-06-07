@@ -203,8 +203,8 @@ func createDefaultLabels(lang, labelsPath string) error {
 		return err
 	}
 
-	appDir := filepath.Dir(labelsPath)
-	localesDir := filepath.Join(appDir, "locales")
+	// Ensure the locales directory exists next to the labels file
+	localesDir := filepath.Dir(labelsPath)
 	if _, err := os.Stat(localesDir); os.IsNotExist(err) {
 		err := os.MkdirAll(localesDir, os.ModePerm)
 		if err != nil {
