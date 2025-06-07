@@ -13,6 +13,8 @@
 .wallets/keystore/
 .idea/
 .idea/*
+bin/*
+build/*
 
 # Test binary, built with `go test -c`
 *.test
