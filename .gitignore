@@ -7,7 +7,6 @@
 *.dll
 *.so
 *.dylib
-blocowallet
 *.DS_Store
 .wallets
 .wallets/wallets.db
@@ -32,5 +31,5 @@ go.work.sum
 .env
 /blocowallet.log
 /wallets.db
-bin/blocowallet
 changelog/
+references/
