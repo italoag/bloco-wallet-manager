@@ -83,14 +83,10 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 			if network.IsActive {
 				status = " (Active)"
 			}
-			customTag := ""
-			if network.IsCustom {
-				customTag = " [Custom]"
-			}
-			networkItems = append(networkItems, fmt.Sprintf("%s%s%s", network.Name, status, customTag))
+			networkItems = append(networkItems, fmt.Sprintf("%s%s", network.Name, status))
 		}
 	}
-	networkItems = append(networkItems, "Add Custom Network", "Back to Settings")
+	networkItems = append(networkItems, "Add Network", "Back to Settings")
 
 	var languageItems []string
 	langCodes := cfg.GetLanguageCodes()
@@ -500,9 +496,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				case 1: // Password input
 					newModel.passwordInput, cmd = newModel.passwordInput.Update(msg)
 				case 2: // Mnemonic input (only in import view) or Private Key input (only in import private key view)
-					if newModel.currentView == ImportWalletView {
+					switch newModel.currentView {
+					case ImportWalletView:
 						newModel.mnemonicInput, cmd = newModel.mnemonicInput.Update(msg)
-					} else if newModel.currentView == ImportPrivateKeyView {
+					case ImportPrivateKeyView:
 						newModel.privateKeyInput, cmd = newModel.privateKeyInput.Update(msg)
 					}
 				}
@@ -560,27 +557,28 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEnterKey()
 
 	case "up", "k":
-		if m.currentView == MenuView {
+		switch m.currentView {
+		case MenuView:
 			if m.selected > 0 {
 				m.selected--
 			}
-		} else if m.currentView == WalletListView {
+		case WalletListView:
 			if m.selected > 0 {
 				m.selected--
 			}
-		} else if m.currentView == SettingsView {
+		case SettingsView:
 			if m.settingsSelected > 0 {
 				m.settingsSelected--
 			}
-		} else if m.currentView == NetworkConfigView {
+		case NetworkConfigView:
 			if !m.editingRPC && m.networkSelected > 0 {
 				m.networkSelected--
 			}
-		} else if m.currentView == LanguageView {
+		case LanguageView:
 			if m.languageSelected > 0 {
 				m.languageSelected--
 			}
-		} else if m.currentView == AddNetworkView {
+		case AddNetworkView:
 			if !m.addingNetwork && m.addNetworkFocus > 0 {
 				m.addNetworkFocus--
 				m.updateAddNetworkFocus()
@@ -590,19 +588,20 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "down", "j":
 		maxItems := 0
-		if m.currentView == MenuView {
+		switch m.currentView {
+		case MenuView:
 			maxItems = 5 // 6 menu items (0-5)
-		} else if m.currentView == WalletListView {
+		case WalletListView:
 			maxItems = len(m.wallets) - 1
-		} else if m.currentView == SettingsView {
+		case SettingsView:
 			maxItems = len(m.settingsItems) - 1
-		} else if m.currentView == NetworkConfigView {
+		case NetworkConfigView:
 			if !m.editingRPC {
 				maxItems = len(m.networkItems) - 1
 			}
-		} else if m.currentView == LanguageView {
+		case LanguageView:
 			maxItems = len(m.languageItems) - 1
-		} else if m.currentView == AddNetworkView {
+		case AddNetworkView:
 			maxItems = 2 // 3 input fields (0-2)
 		}
 
@@ -842,8 +841,6 @@ func (m Model) renderMenu() string {
 	for i, item := range menuItems {
 		if i == m.selected {
 			selectedStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("86")).
-				Foreground(lipgloss.Color("232")).
 				Padding(0, 1)
 			b.WriteString(selectedStyle.Render("→ " + item))
 		} else {
@@ -881,8 +878,6 @@ func (m Model) renderWalletList() string {
 		for i, wallet := range m.wallets {
 			if i == m.selected {
 				selectedStyle := lipgloss.NewStyle().
-					Background(lipgloss.Color("86")).
-					Foreground(lipgloss.Color("232")).
 					Padding(0, 1)
 				b.WriteString(selectedStyle.Render(fmt.Sprintf("→ %s (%s)", wallet.Name, wallet.Address[:10]+"...")))
 			} else {
@@ -946,12 +941,11 @@ func (m Model) renderWalletAuth() string {
 	return b.String()
 }
 
-func (m Model) renderWalletDetails() string {
+func (m *Model) renderWalletDetails() string {
 	var b strings.Builder
 
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
 		MarginBottom(2)
 
 	if m.selectedWallet == nil {
@@ -972,7 +966,6 @@ func (m Model) renderWalletDetails() string {
 
 	// Add sensitive information section
 	sensitiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("208")).
 		Bold(true)
 
 	b.WriteString(sensitiveStyle.Render("🔐 Sensitive Information:"))
@@ -1057,14 +1050,10 @@ func (m Model) renderWalletDetails() string {
 	// Render multi-network balances
 	if m.currentMultiBalance != nil {
 		balanceStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("86"))
+			Bold(true)
 
-		networkStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
-
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196"))
+		networkStyle := lipgloss.NewStyle()
+		errorStyle := lipgloss.NewStyle()
 
 		b.WriteString(balanceStyle.Render("🌐 Network Balances:"))
 		b.WriteString("\n\n")
@@ -1120,7 +1109,6 @@ func (m Model) renderCreateWallet() string {
 
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
 		MarginBottom(2)
 
 	b.WriteString(headerStyle.Render("➕ Create New Wallet"))
@@ -1155,7 +1143,6 @@ func (m Model) renderImportWallet() string {
 
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
 		MarginBottom(2)
 
 	b.WriteString(headerStyle.Render("📥 Import Wallet"))
@@ -1230,7 +1217,7 @@ func (m Model) renderImportPrivateKey() string {
 	return b.String()
 }
 
-// refreshNetworkItems updates the network items list
+// refreshNetworkItems updnetates the network items list
 func (m *Model) refreshNetworkItems() {
 	var networkItems []string
 	networkKeys := m.config.GetAllNetworkKeys()
@@ -1240,13 +1227,9 @@ func (m *Model) refreshNetworkItems() {
 			if network.IsActive {
 				status = " (Active)"
 			}
-			customTag := ""
-			if network.IsCustom {
-				customTag = " [Custom]"
-			}
-			networkItems = append(networkItems, fmt.Sprintf("%s%s%s", network.Name, status, customTag))
+			networkItems = append(networkItems, fmt.Sprintf("%s%s", network.Name, status))
 		}
 	}
-	networkItems = append(networkItems, "Add Custom Network", "Back to Settings")
+	networkItems = append(networkItems, "Add Network", "Back to Settings")
 	m.networkItems = networkItems
 }

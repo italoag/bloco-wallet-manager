@@ -36,7 +36,8 @@ func (m Model) handleInputNavigation(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 // handleInputSubmit handles form submission in input views
 func (m Model) handleInputSubmit() (Model, tea.Cmd) {
-	if m.currentView == CreateWalletView {
+	switch m.currentView {
+	case CreateWalletView:
 		name := strings.TrimSpace(m.nameInput.Value())
 		password := strings.TrimSpace(m.passwordInput.Value())
 
@@ -46,7 +47,7 @@ func (m Model) handleInputSubmit() (Model, tea.Cmd) {
 		}
 
 		return m, m.createWalletCmd(name, password)
-	} else if m.currentView == ImportWalletView {
+	case ImportWalletView:
 		name := strings.TrimSpace(m.nameInput.Value())
 		password := strings.TrimSpace(m.passwordInput.Value())
 		mnemonic := strings.TrimSpace(m.mnemonicInput.Value())
@@ -62,7 +63,7 @@ func (m Model) handleInputSubmit() (Model, tea.Cmd) {
 		}
 
 		return m, m.importWalletCmd(name, password, mnemonic)
-	} else if m.currentView == ImportPrivateKeyView {
+	case ImportPrivateKeyView:
 		name := strings.TrimSpace(m.nameInput.Value())
 		password := strings.TrimSpace(m.passwordInput.Value())
 		privateKey := strings.TrimSpace(m.privateKeyInput.Value())
@@ -78,7 +79,7 @@ func (m Model) handleInputSubmit() (Model, tea.Cmd) {
 		}
 
 		return m, m.importWalletFromPrivateKeyCmd(name, password, privateKey)
-	} else if m.currentView == WalletAuthView {
+	case WalletAuthView:
 		// Handle wallet authentication
 		password := strings.TrimSpace(m.walletAuthPassword.Value())
 		if password == "" {
