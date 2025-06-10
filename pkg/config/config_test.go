@@ -15,12 +15,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Default language should be 'en', got: %s", config.Language)
 	}
 
-	if len(config.Networks) == 0 {
-		t.Fatal("Default config should have networks")
-	}
-
-	if _, exists := config.Networks["ethereum"]; !exists {
-		t.Fatal("Default config should have Ethereum network")
+	if len(config.Networks) != 0 {
+		t.Fatalf("Expected no default networks, got %d", len(config.Networks))
 	}
 
 	if config.Database.Type != "sqlite" {
