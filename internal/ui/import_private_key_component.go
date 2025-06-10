@@ -105,13 +105,8 @@ func (c *ImportPrivateKeyComponent) Reset() {
 
 // Init initializes the component
 func (c *ImportPrivateKeyComponent) Init() tea.Cmd {
-	// Ensure the form receives focus on the first input field
-	return tea.Batch(
-		c.form.Init(),
-		func() tea.Msg {
-			return tea.KeyMsg{Type: tea.KeyTab}
-		},
-	)
+	// Initialize the form so the first input is focused
+	return c.form.Init()
 }
 
 // Update handles messages for the import private key component

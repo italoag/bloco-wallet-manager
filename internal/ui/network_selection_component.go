@@ -73,14 +73,8 @@ func (c *NetworkSelectionComponent) initForm() {
 
 // Init initializes the component
 func (c *NetworkSelectionComponent) Init() tea.Cmd {
-	// Inicializar o formulário e garantir que ele receba foco automaticamente
-	return tea.Batch(
-		c.form.Init(),
-		// Enviar uma mensagem de tecla de tab para focar no primeiro campo
-		func() tea.Msg {
-			return tea.KeyMsg{Type: tea.KeyTab}
-		},
-	)
+	// Initialize the form and focus the first field
+	return c.form.Init()
 }
 
 // SetSize updates the component size

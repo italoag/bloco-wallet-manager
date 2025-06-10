@@ -92,13 +92,8 @@ func (c *CreateWalletComponent) Reset() {
 
 // Init initializes the component
 func (c *CreateWalletComponent) Init() tea.Cmd {
-	// Ensure the first input is focused so the user can start typing
-	return tea.Batch(
-		c.form.Init(),
-		func() tea.Msg {
-			return tea.KeyMsg{Type: tea.KeyTab}
-		},
-	)
+	// Initialize the form so the first field receives focus
+	return c.form.Init()
 }
 
 // Update handles messages for the create wallet component
