@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -59,10 +61,11 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 	rpcInput.Placeholder = "https://..."
 	rpcInput.Width = 60
 
-	// Add network inputs
+	// Add network inputs with autocomplete
 	networkNameInput := textinput.New()
 	networkNameInput.Placeholder = "Enter network name..."
 	networkNameInput.Width = 40
+	networkNameInput.ShowSuggestions = true
 
 	chainIDInput := textinput.New()
 	chainIDInput.Placeholder = "Enter chain ID (e.g., 137)..."
@@ -104,24 +107,38 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 	}
 	languageItems = append(languageItems, "Back to Settings")
 
+	// Initialize spinner
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
+
 	// Create the model
 	model := Model{
-		walletService:       walletService,
-		config:              cfg,
-		wallets:             []*wallet.Wallet{},
-		selected:            0,
-		loading:             false,
-		currentView:         SplashView,
-		
+		walletService: walletService,
+		config:        cfg,
+		wallets:       []*wallet.Wallet{},
+		selected:      0,
+		loading:       false,
+		currentView:   SplashView,
+
 		// Initialize components
 		splashComponent:           NewSplashComponent(),
 		mainMenuComponent:         NewMainMenuComponent(),
+		settingsMenuComponent:     NewSettingsMenuComponent(),
+		networkListComponent:      NewNetworkListComponent(cfg),
+		addNetworkComponent:       NewAddNetworkComponent(),
+		languageMenuComponent:     NewLanguageMenuComponent(cfg),
 		walletListComponent:       NewWalletListComponent(),
 		balanceComponent:          NewBalanceComponent(),
 		createWalletComponent:     NewCreateWalletComponent(),
 		importMnemonicComponent:   NewImportMnemonicComponent(),
 		importPrivateKeyComponent: NewImportPrivateKeyComponent(),
-		
+
+		// Loading components
+		loadingSpinner: s,
+		isLoading:      false,
+		loadingText:    "",
+
 		// Legacy fields (to be removed gradually)
 		nameInput:           nameInput,
 		passwordInput:       passwordInput,
@@ -156,6 +173,9 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 
 	// Load a default TDF font
 	model.loadDefaultFont()
+
+	// Setup wallet table
+	model.setupWalletTable()
 
 	return model
 }
@@ -259,6 +279,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Update components based on current view - for form views, let components handle ALL messages first
+	var cmd tea.Cmd
+	switch m.currentView {
+	case MenuView:
+		updatedComponent, componentCmd := m.mainMenuComponent.Update(msg)
+		m.mainMenuComponent = *updatedComponent
+		cmd = componentCmd
+	case SettingsView:
+		updatedComponent, componentCmd := m.settingsMenuComponent.Update(msg)
+		m.settingsMenuComponent = *updatedComponent
+		cmd = componentCmd
+	case NetworkConfigView:
+		updatedComponent, componentCmd := m.networkListComponent.Update(msg)
+		m.networkListComponent = *updatedComponent
+		cmd = componentCmd
+	case LanguageView:
+		updatedComponent, componentCmd := m.languageMenuComponent.Update(msg)
+		m.languageMenuComponent = *updatedComponent
+		cmd = componentCmd
+	case AddNetworkView:
+		updatedComponent, componentCmd := m.addNetworkComponent.Update(msg)
+		m.addNetworkComponent = *updatedComponent
+		cmd = componentCmd
+	case CreateWalletView:
+		updatedComponent, componentCmd := m.createWalletComponent.Update(msg)
+		m.createWalletComponent = *updatedComponent
+		cmd = componentCmd
+	case ImportWalletView:
+		updatedComponent, componentCmd := m.importMnemonicComponent.Update(msg)
+		m.importMnemonicComponent = *updatedComponent
+		cmd = componentCmd
+	case ImportPrivateKeyView:
+		updatedComponent, componentCmd := m.importPrivateKeyComponent.Update(msg)
+		m.importPrivateKeyComponent = *updatedComponent
+		cmd = componentCmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.MouseMsg:
 		// Update bubblezone with mouse events
@@ -267,7 +324,70 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		// Update components with new size
+		m.mainMenuComponent.SetSize(msg.Width, msg.Height)
+		m.settingsMenuComponent.SetSize(msg.Width, msg.Height)
+		m.networkListComponent.SetSize(msg.Width, msg.Height)
+		m.addNetworkComponent.SetSize(msg.Width, msg.Height)
+		m.languageMenuComponent.SetSize(msg.Width, msg.Height)
+		m.createWalletComponent.SetSize(msg.Width, msg.Height)
+		m.importMnemonicComponent.SetSize(msg.Width, msg.Height)
+		m.importPrivateKeyComponent.SetSize(msg.Width, msg.Height)
+		// Update table size when window resizes
+		m.setupWalletTable()
+		m.updateWalletTable()
+		return m, cmd
+
+	case MenuItemSelectedMsg:
+		return m.handleMenuSelection(msg)
+
+	case SettingsItemSelectedMsg:
+		return m.handleSettingsSelection(msg)
+
+	case BackToSettingsMsg:
+		m.currentView = SettingsView
 		return m, nil
+
+	case NetworkAddRequestMsg:
+		m.currentView = AddNetworkView
+		m.addNetworkComponent.Reset()
+		return m, m.addNetworkComponent.Init()
+
+	case AddNetworkRequestMsg:
+		return m.handleAddNetworkRequest(msg)
+
+	case BackToNetworkListMsg:
+		m.currentView = NetworkConfigView
+		m.networkListComponent.RefreshNetworks()
+		return m, nil
+
+	case NetworkToggleMsg:
+		return m.handleNetworkToggle(msg)
+
+	case NetworkEditMsg:
+		return m.handleNetworkEdit(msg)
+
+	case NetworkDeleteMsg:
+		return m.handleNetworkDelete(msg)
+
+	case NetworkSelectedMsg:
+		return m.handleNetworkSelected(msg)
+
+	case LanguageSelectedMsg:
+		return m.handleLanguageSelected(msg)
+
+	case CreateWalletRequestMsg:
+		return m.handleCreateWalletRequest(msg)
+
+	case ImportMnemonicRequestMsg:
+		return m.handleImportMnemonicRequest(msg)
+
+	case ImportPrivateKeyRequestMsg:
+		return m.handleImportPrivateKeyRequest(msg)
+
+	case BackToMenuMsg:
+		m.currentView = MenuView
+		return m, cmd
 
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -276,6 +396,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wallets = []*wallet.Wallet(msg)
 		m.loading = false
 		m.err = nil
+		m.stopLoading()
+		m.updateWalletTable()
 		return m, nil
 
 	case balanceLoadedMsg:
@@ -284,33 +406,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case multiBalanceLoadedMsg:
 		m.currentMultiBalance = (*wallet.MultiNetworkBalance)(msg)
+		m.stopLoading()
 		return m, nil
 
 	case walletCreatedMsg:
 		newModel := m
 		newModel.currentView = WalletListView
 		newModel.selected = 0
-		// Reset inputs manually
-		newModel.nameInput.SetValue("")
-		newModel.passwordInput.SetValue("")
-		newModel.mnemonicInput.SetValue("")
-		newModel.privateKeyInput.SetValue("")
-		newModel.inputFocus = 0
-		newModel.nameInput.Blur()
-		newModel.passwordInput.Blur()
-		newModel.mnemonicInput.Blur()
-		newModel.privateKeyInput.Blur()
+		// Reset components
+		newModel.createWalletComponent.Reset()
+		newModel.importMnemonicComponent.Reset()
+		newModel.importPrivateKeyComponent.Reset()
 		return newModel, newModel.loadWalletsCmd()
 
 	case errorMsg:
 		m.err = fmt.Errorf("%s", string(msg))
 		m.loading = false
+		// Pass error to current component
+		switch m.currentView {
+		case CreateWalletView:
+			m.createWalletComponent.SetError(m.err)
+		case ImportWalletView:
+			m.importMnemonicComponent.SetError(m.err)
+		case ImportPrivateKeyView:
+			m.importPrivateKeyComponent.SetError(m.err)
+		}
 		return m, nil
 
 	case networkSuggestionsMsg:
 		m.networkSuggestions = []blockchain.NetworkSuggestion(msg)
 		m.showingSuggestions = len(m.networkSuggestions) > 0
 		m.selectedSuggestion = 0
+		m.stopLoading()
+
+		// Update autocomplete suggestions
+		suggestions := make([]string, len(m.networkSuggestions))
+		for i, suggestion := range m.networkSuggestions {
+			suggestions[i] = suggestion.Name
+		}
+		m.networkNameInput.SetSuggestions(suggestions)
 		return m, nil
 
 	case chainInfoLoadedMsg:
@@ -359,7 +493,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case networkAddedMsg:
 		// Add the custom network to config
-		m.config.AddCustomNetwork(msg.key, msg.network)
+		network, ok := msg.network.(config.Network)
+		if !ok {
+			m.err = fmt.Errorf("invalid network type")
+			return m, nil
+		}
+		m.config.AddCustomNetwork(msg.key, network)
 		if err := m.config.Save(); err != nil {
 			m.err = err
 		} else {
@@ -380,6 +519,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = fmt.Errorf("%s", string(msg))
 		m.addingNetwork = false
 		return m, nil
+
+	case spinner.TickMsg:
+		if m.isLoading {
+			var cmd tea.Cmd
+			m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
+			return m, cmd
+		}
 	}
 
 	return m, nil
@@ -412,16 +558,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			newModel.currentView = MenuView
 			newModel.selected = 0
-			// Reset inputs manually instead of calling resetInputs
-			newModel.nameInput.SetValue("")
-			newModel.passwordInput.SetValue("")
-			newModel.mnemonicInput.SetValue("")
-			newModel.privateKeyInput.SetValue("")
-			newModel.inputFocus = 0
-			newModel.nameInput.Blur()
-			newModel.passwordInput.Blur()
-			newModel.mnemonicInput.Blur()
-			newModel.privateKeyInput.Blur()
+			// Reset component state instead of legacy input handling
+			newModel.createWalletComponent.Reset()
+			newModel.importMnemonicComponent.Reset()
+			newModel.importPrivateKeyComponent.Reset()
 			return newModel, nil
 		case "tab", "shift+tab", "up", "down":
 			if m.currentView == AddNetworkView {
@@ -479,7 +619,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 					// Trigger search if value changed and has at least 2 characters
 					if oldValue != newValue && len(strings.TrimSpace(newValue)) >= 2 {
-						return newModel, tea.Batch(cmd, newModel.searchNetworksCmd(newValue))
+						startLoadingCmd := newModel.startLoading("Searching networks...")
+						return newModel, tea.Batch(cmd, startLoadingCmd, newModel.searchNetworksCmd(newValue))
 					}
 
 					// Hide suggestions if input is too short
@@ -540,7 +681,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case CreateWalletView, ImportWalletView, ImportPrivateKeyView:
 			m.currentView = MenuView
 			m.selected = 0
-			m.resetInputs()
+			// Reset component state instead of legacy input handling
+			m.createWalletComponent.Reset()
+			m.importMnemonicComponent.Reset()
+			m.importPrivateKeyComponent.Reset()
 		case SettingsView:
 			m.currentView = MenuView
 			m.selected = 0
@@ -576,8 +720,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selected--
 			}
 		} else if m.currentView == WalletListView {
-			if m.selected > 0 {
-				m.selected--
+			if len(m.wallets) > 0 {
+				var cmd tea.Cmd
+				m.walletTable, cmd = m.walletTable.Update(msg)
+				return m, cmd
 			}
 		} else if m.currentView == SettingsView {
 			if m.settingsSelected > 0 {
@@ -626,6 +772,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.currentView == AddNetworkView && !m.addingNetwork && m.addNetworkFocus < maxItems {
 			m.addNetworkFocus++
 			m.updateAddNetworkFocus()
+		} else if m.currentView == WalletListView && len(m.wallets) > 0 {
+			var cmd tea.Cmd
+			m.walletTable, cmd = m.walletTable.Update(msg)
+			return m, cmd
 		} else if m.selected < maxItems {
 			m.selected++
 		}
@@ -696,12 +846,154 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		// A lógica de cancelamento agora é feita pelo diálogo
 		return m, nil
+
+	case "r":
+		// Refresh functionality
+		if m.currentView == WalletListView {
+			return m, tea.Batch(m.startLoading("Refreshing wallets..."), m.loadWalletsCmd())
+		} else if m.currentView == WalletDetailsView && m.selectedWallet != nil {
+			return m, tea.Batch(m.startLoading("Refreshing balance..."), m.getMultiBalanceCmd(m.selectedWallet.Address))
+		}
+		return m, nil
 	}
 
 	return m, nil
 }
 
-// handleInputNavigation handles navigation between input fields
+// handleMenuSelection handles menu item selection messages
+func (m Model) handleMenuSelection(msg MenuItemSelectedMsg) (tea.Model, tea.Cmd) {
+	switch msg.Index {
+	case 0: // View Wallets
+		m.currentView = WalletListView
+		return m, m.loadWalletsCmd()
+	case 1: // Create New Wallet
+		m.currentView = CreateWalletView
+		m.createWalletComponent.Reset()
+		return m, m.createWalletComponent.Init()
+	case 2: // Import Wallet from Mnemonic
+		m.currentView = ImportWalletView
+		m.importMnemonicComponent.Reset()
+		return m, m.importMnemonicComponent.Init()
+	case 3: // Import Wallet from Private Key
+		m.currentView = ImportPrivateKeyView
+		m.importPrivateKeyComponent.Reset()
+		return m, m.importPrivateKeyComponent.Init()
+	case 4: // Settings
+		m.currentView = SettingsView
+		return m, nil
+	case 5: // Exit
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// handleSettingsSelection handles settings menu item selection messages
+func (m Model) handleSettingsSelection(msg SettingsItemSelectedMsg) (tea.Model, tea.Cmd) {
+	switch msg.Index {
+	case 0: // Network Configuration
+		m.currentView = NetworkConfigView
+		return m, nil
+	case 1: // Language
+		m.currentView = LanguageView
+		return m, nil
+	case 2: // Back to Main Menu
+		m.currentView = MenuView
+		return m, nil
+	}
+	return m, nil
+}
+
+// handleCreateWalletRequest handles wallet creation requests
+func (m Model) handleCreateWalletRequest(msg CreateWalletRequestMsg) (tea.Model, tea.Cmd) {
+	m.createWalletComponent.SetCreating(true)
+	return m, m.createWalletCmd(msg.Name, msg.Password)
+}
+
+// handleImportMnemonicRequest handles mnemonic import requests
+func (m Model) handleImportMnemonicRequest(msg ImportMnemonicRequestMsg) (tea.Model, tea.Cmd) {
+	m.importMnemonicComponent.SetImporting(true)
+	return m, m.importWalletCmd(msg.Name, msg.Password, msg.Mnemonic)
+}
+
+// handleImportPrivateKeyRequest handles private key import requests
+func (m Model) handleImportPrivateKeyRequest(msg ImportPrivateKeyRequestMsg) (tea.Model, tea.Cmd) {
+	m.importPrivateKeyComponent.SetImporting(true)
+	return m, m.importWalletFromPrivateKeyCmd(msg.Name, msg.Password, msg.PrivateKey)
+}
+
+// handleAddNetworkRequest handles add network requests
+func (m Model) handleAddNetworkRequest(msg AddNetworkRequestMsg) (tea.Model, tea.Cmd) {
+	m.addNetworkComponent.SetAdding(true)
+	return m, m.addNetworkCmd(msg.Name, msg.ChainID, msg.RPCEndpoint)
+}
+
+// handleNetworkToggle handles network toggle requests
+func (m Model) handleNetworkToggle(msg NetworkToggleMsg) (tea.Model, tea.Cmd) {
+	err := m.config.ToggleNetworkActive(msg.Key)
+	if err == nil {
+		// Refresh multi-provider with updated network configuration
+		m.walletService.RefreshMultiProvider(m.config)
+		// Save configuration
+		_ = m.config.Save()
+		// Refresh network list
+		m.networkListComponent.RefreshNetworks()
+	}
+	return m, nil
+}
+
+// handleNetworkEdit handles network edit requests
+func (m Model) handleNetworkEdit(msg NetworkEditMsg) (tea.Model, tea.Cmd) {
+	// For now, we don't have a separate edit view, so this is a placeholder
+	// In the future, this could open an edit form similar to add network
+	return m, nil
+}
+
+// handleNetworkDelete handles network delete requests
+func (m Model) handleNetworkDelete(msg NetworkDeleteMsg) (tea.Model, tea.Cmd) {
+	m.config.RemoveCustomNetwork(msg.Key)
+	// Save configuration
+	_ = m.config.Save()
+	// Refresh network list
+	m.networkListComponent.RefreshNetworks()
+	return m, nil
+}
+
+// handleNetworkSelected handles network selection for details view
+func (m Model) handleNetworkSelected(msg NetworkSelectedMsg) (tea.Model, tea.Cmd) {
+	switch msg.Key {
+	case "add-network":
+		m.currentView = AddNetworkView
+		m.addNetworkComponent.Reset()
+		return m, m.addNetworkComponent.Init()
+	case "back-to-settings":
+		m.currentView = SettingsView
+		return m, nil
+	default:
+		// Handle regular network selection - for now just show details
+		// In the future this could open a network details view
+		return m, nil
+	}
+}
+
+// handleLanguageSelected handles language selection
+func (m Model) handleLanguageSelected(msg LanguageSelectedMsg) (tea.Model, tea.Cmd) {
+	switch msg.Code {
+	case "back-to-settings":
+		m.currentView = SettingsView
+		return m, nil
+	default:
+		// Change language
+		m.config.Language = msg.Code
+		if err := m.config.Save(); err == nil {
+			// Refresh language menu to show new selection
+			m.languageMenuComponent.RefreshLanguages()
+		}
+		// Go back to settings
+		m.currentView = SettingsView
+		return m, nil
+	}
+}
+
 // View renders the TUI
 func (m Model) View() string {
 	if m.width == 0 {
@@ -713,7 +1005,9 @@ func (m Model) View() string {
 	case SplashView:
 		baseView = m.renderSplash()
 	case MenuView:
-		baseView = m.renderMenu()
+		baseView = m.mainMenuComponent.View()
+	case SettingsView:
+		baseView = m.settingsMenuComponent.View()
 	case WalletListView:
 		baseView = m.renderWalletList()
 	case WalletAuthView:
@@ -721,19 +1015,17 @@ func (m Model) View() string {
 	case WalletDetailsView:
 		baseView = m.renderWalletDetails()
 	case CreateWalletView:
-		baseView = m.renderCreateWallet()
+		baseView = m.createWalletComponent.View()
 	case ImportWalletView:
-		baseView = m.renderImportWallet()
+		baseView = m.importMnemonicComponent.View()
 	case ImportPrivateKeyView:
-		baseView = m.renderImportPrivateKey()
-	case SettingsView:
-		baseView = m.renderSettings()
+		baseView = m.importPrivateKeyComponent.View()
 	case NetworkConfigView:
-		baseView = m.renderNetworkConfig()
+		baseView = m.networkListComponent.View()
 	case LanguageView:
-		baseView = m.renderLanguage()
+		baseView = m.languageMenuComponent.View()
 	case AddNetworkView:
-		baseView = m.renderAddNetwork()
+		baseView = m.addNetworkComponent.View()
 	case NetworkDetailsView:
 		baseView = m.renderNetworkDetails()
 	default:
@@ -769,7 +1061,7 @@ func (m Model) renderSplash() string {
 		renderedLogo = strings.TrimSpace(renderedLogo)
 
 		// Project info
-		projectInfo := fmt.Sprintf("%s v%s", "BLOCO Wallet Manager", "1.0.0")
+		projectInfo := fmt.Sprintf("%s v%s", "BLOCO Wallet Manager", "0.2.0")
 
 		// Center the project info text
 		projectInfoStyled := lipgloss.NewStyle().
@@ -820,7 +1112,7 @@ func (m Model) renderSplash() string {
 		Align(lipgloss.Center).
 		Width(m.width)
 
-	b.WriteString(subtitleStyle.Render("Your Ethereum Wallet Manager"))
+	b.WriteString(subtitleStyle.Render("Your Blockchain Wallet"))
 	b.WriteString("\n\n")
 
 	instructionStyle := lipgloss.NewStyle().
@@ -833,87 +1125,66 @@ func (m Model) renderSplash() string {
 	return b.String()
 }
 
-func (m Model) renderMenu() string {
-	var b strings.Builder
-
-	headerStyle := HeaderStyle
-
-	b.WriteString(headerStyle.Render("🏦 BlocoWallet - Main Menu"))
-	b.WriteString("\n\n")
-
-	menuItems := []string{
-		"📋 View Wallets",
-		"➕ Create New Wallet",
-		"📥 Import Wallet (Mnemonic)",
-		"🔑 Import Wallet (Private Key)",
-		"⚙️  Settings",
-		"🚪 Exit",
-	}
-
-	for i, item := range menuItems {
-		if i == m.selected {
-			selectedStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("86")).
-				Foreground(lipgloss.Color("232")).
-				Padding(0, 1)
-			b.WriteString(selectedStyle.Render("→ " + item))
-		} else {
-			b.WriteString("  " + item)
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("↑/↓: navigate • enter: select • q: quit"))
-
-	return b.String()
-}
 
 func (m Model) renderWalletList() string {
-	var b strings.Builder
+	var contentParts []string
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
+	// Header
+	headerStyle := HeaderStyle
+	contentParts = append(contentParts, headerStyle.Render("📋 Your Wallets"))
+	contentParts = append(contentParts, "")
 
-	b.WriteString(headerStyle.Render("📋 Your Wallets"))
-	b.WriteString("\n\n")
-
-	if m.loading {
-		b.WriteString("Loading wallets...")
-		return b.String()
-	}
-
+	// Main content
 	if len(m.wallets) == 0 {
-		b.WriteString("No wallets found. Create a new wallet to get started.\n\n")
+		contentParts = append(contentParts, InfoStyle.Render("No wallets found. Create a new wallet to get started."))
 	} else {
-		for i, wallet := range m.wallets {
-			if i == m.selected {
-				selectedStyle := lipgloss.NewStyle().
-					Background(lipgloss.Color("86")).
-					Foreground(lipgloss.Color("232")).
-					Padding(0, 1)
-				b.WriteString(selectedStyle.Render(fmt.Sprintf("→ %s (%s)", wallet.Name, wallet.Address[:10]+"...")))
-			} else {
-				b.WriteString(fmt.Sprintf("  %s (%s)", wallet.Name, wallet.Address[:10]+"..."))
-			}
-			b.WriteString("\n")
-		}
-		b.WriteString("\n")
+		// Use table view for wallets
+		contentParts = append(contentParts, m.walletTable.View())
 	}
 
+	// Error display
 	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n\n")
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, ErrorStyle.Render("Error: "+m.err.Error()))
 	}
 
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("↑/↓: navigate • enter: view details • r: refresh • esc: back • q: quit"))
+	// Create main content
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
 
-	return b.String()
+	// Footer
+	footerText := "↑/↓: navigate • enter: view details • r: refresh • esc: back • q: quit"
+	footer := FooterStyle.Render(footerText)
+
+	// Loading status (appears at bottom)
+	var loadingStatus string
+	if m.loading || m.isLoading {
+		loadingText := m.loadingText
+		if loadingText == "" {
+			loadingText = "Loading wallets..."
+		}
+		loadingStatus = LoadingStyle.Render(fmt.Sprintf("%s %s", m.loadingSpinner.View(), loadingText))
+	}
+
+	// Combine all parts with proper spacing
+	var finalParts []string
+	finalParts = append(finalParts, mainContent)
+
+	// Add spacing before footer/loading
+	availableHeight := m.height - lipgloss.Height(mainContent) - 4
+	if availableHeight > 0 {
+		padding := strings.Repeat("\n", availableHeight)
+		finalParts = append(finalParts, padding)
+	}
+
+	// Add loading status if present
+	if loadingStatus != "" {
+		finalParts = append(finalParts, loadingStatus)
+	}
+
+	// Add footer
+	finalParts = append(finalParts, footer)
+
+	return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
 }
 
 func (m Model) renderWalletAuth() string {
@@ -958,288 +1229,179 @@ func (m Model) renderWalletAuth() string {
 }
 
 func (m Model) renderWalletDetails() string {
-	var b strings.Builder
-
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
+	var contentParts []string
 
 	if m.selectedWallet == nil {
-		b.WriteString(headerStyle.Render("💳 Wallet Details"))
-		b.WriteString("\n\nNo wallet selected.")
-		return b.String()
+		contentParts = append(contentParts, HeaderStyle.Render("💳 Wallet Details"))
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, InfoStyle.Render("No wallet selected."))
+		return lipgloss.JoinVertical(lipgloss.Left, contentParts...)
 	}
 
-	b.WriteString(headerStyle.Render("💳 " + m.selectedWallet.Name))
-	b.WriteString("\n\n")
+	// Header
+	contentParts = append(contentParts, HeaderStyle.Render("💳 "+m.selectedWallet.Name))
+	contentParts = append(contentParts, "")
 
+	// Basic info
 	info := fmt.Sprintf("Address: %s\nCreated: %s",
 		m.selectedWallet.Address,
 		m.selectedWallet.CreatedAt.Format("2006-01-02 15:04:05"))
+	contentParts = append(contentParts, ValueStyle.Render(info))
+	contentParts = append(contentParts, "")
 
-	b.WriteString(info)
-	b.WriteString("\n\n")
-
-	// Add sensitive information section
-	sensitiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("208")).
-		Bold(true)
-
-	b.WriteString(sensitiveStyle.Render("🔐 Sensitive Information:"))
-	b.WriteString("\n")
+	// Sensitive information section
+	contentParts = append(contentParts, SensitiveStyle.Render("🔐 Sensitive Information:"))
 
 	// Private Key
 	if m.showSensitiveInfo {
 		if m.selectedWallet.EncryptedMnemonic != "" {
-			// Get cached password for this wallet
 			password, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address)
 			if hasPassword {
-				// Decrypt mnemonic and derive private key
 				mnemonic, err := m.walletService.GetMnemonicFromWallet(m.selectedWallet, password)
 				if err != nil {
-					b.WriteString(fmt.Sprintf("Private Key: Error decrypting mnemonic - %v\n", err))
+					contentParts = append(contentParts, ErrorStyle.Render(fmt.Sprintf("Private Key: Error decrypting mnemonic - %v", err)))
 				} else {
 					privateKey, err := wallet.DerivePrivateKey(mnemonic)
 					if err != nil {
-						b.WriteString(fmt.Sprintf("Private Key: Error deriving key - %v\n", err))
+						contentParts = append(contentParts, ErrorStyle.Render(fmt.Sprintf("Private Key: Error deriving key - %v", err)))
 					} else {
-						b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKey))
+						contentParts = append(contentParts, ValueStyle.Render(fmt.Sprintf("Private Key: %s", privateKey)))
 					}
 				}
 			} else {
-				b.WriteString("Private Key: Authentication required\n")
+				contentParts = append(contentParts, InfoStyle.Render("Private Key: Authentication required"))
 			}
 		} else if m.selectedWallet.KeyStorePath != "" {
-			// Handle keystore-based wallets (both mnemonic-based and private key imports)
 			if m.extractedPrivateKey != "" {
-				// Private key has been successfully extracted
-				b.WriteString(fmt.Sprintf("Private Key: %s\n", m.extractedPrivateKey))
+				contentParts = append(contentParts, ValueStyle.Render(fmt.Sprintf("Private Key: %s", m.extractedPrivateKey)))
 			} else {
-				// Try to extract using cached password
 				if cachedPassword, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address); hasPassword {
 					privateKey, err := m.walletService.LoadPrivateKeyFromKeyStoreV3(m.selectedWallet.KeyStorePath, cachedPassword)
 					if err != nil {
-						b.WriteString(fmt.Sprintf("Private Key: Error - %s\n", err.Error()))
+						contentParts = append(contentParts, ErrorStyle.Render(fmt.Sprintf("Private Key: Error - %s", err.Error())))
 					} else {
-						// Cache the extracted private key for subsequent renders
 						privateKeyHex := fmt.Sprintf("%x", privateKey.D.Bytes())
 						m.extractedPrivateKey = privateKeyHex
-						b.WriteString(fmt.Sprintf("Private Key: %s\n", privateKeyHex))
+						contentParts = append(contentParts, ValueStyle.Render(fmt.Sprintf("Private Key: %s", privateKeyHex)))
 					}
 				} else {
-					// This shouldn't happen since we require auth before entering details
-					b.WriteString("Private Key: Authentication required\n")
+					contentParts = append(contentParts, InfoStyle.Render("Private Key: Authentication required"))
 				}
 			}
 		} else {
-			// Neither mnemonic nor keystore path available - this should be rare
-			b.WriteString("Private Key: Not available (no keystore or mnemonic found)\n")
+			contentParts = append(contentParts, InfoStyle.Render("Private Key: Not available (no keystore or mnemonic found)"))
 		}
 	} else {
-		b.WriteString("Private Key: ********************************\n")
+		contentParts = append(contentParts, InfoStyle.Render("Private Key: ********************************"))
 	}
 
 	// Mnemonic
 	if m.showSensitiveInfo {
 		if m.selectedWallet.EncryptedMnemonic != "" {
-			// Get cached password for this wallet
 			password, hasPassword := m.walletService.GetWalletPassword(m.selectedWallet.Address)
 			if hasPassword {
-				// Decrypt mnemonic
 				mnemonic, err := m.walletService.GetMnemonicFromWallet(m.selectedWallet, password)
 				if err != nil {
-					b.WriteString(fmt.Sprintf("Mnemonic: Error decrypting - %v\n", err))
+					contentParts = append(contentParts, ErrorStyle.Render(fmt.Sprintf("Mnemonic: Error decrypting - %v", err)))
 				} else {
-					b.WriteString(fmt.Sprintf("Mnemonic: %s\n", mnemonic))
+					contentParts = append(contentParts, ValueStyle.Render(fmt.Sprintf("Mnemonic: %s", mnemonic)))
 				}
 			} else {
-				b.WriteString("Mnemonic: Authentication required\n")
+				contentParts = append(contentParts, InfoStyle.Render("Mnemonic: Authentication required"))
 			}
 		} else {
-			b.WriteString("Mnemonic: Not available (imported from private key)\n")
+			contentParts = append(contentParts, InfoStyle.Render("Mnemonic: Not available (imported from private key)"))
 		}
 	} else {
-		b.WriteString("Mnemonic: *** *** *** *** *** *** *** *** *** *** *** ***\n")
+		contentParts = append(contentParts, InfoStyle.Render("Mnemonic: *** *** *** *** *** *** *** *** *** *** *** ***"))
 	}
 
-	b.WriteString("\n")
+	contentParts = append(contentParts, "")
 
 	// Render multi-network balances
 	if m.currentMultiBalance != nil {
-		balanceStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("86"))
-
-		networkStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
-
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196"))
-
-		b.WriteString(balanceStyle.Render("🌐 Network Balances:"))
-		b.WriteString("\n\n")
+		contentParts = append(contentParts, BalanceStyle.Render("🌐 Network Balances:"))
+		contentParts = append(contentParts, "")
 
 		for _, networkBalance := range m.currentMultiBalance.NetworkBalances {
 			if networkBalance.Error != nil {
-				b.WriteString(networkStyle.Render(fmt.Sprintf("  %s: ", networkBalance.NetworkName)))
-				b.WriteString(errorStyle.Render(fmt.Sprintf("Error - %v", networkBalance.Error)))
+				networkLine := fmt.Sprintf("  %s: ", networkBalance.NetworkName)
+				errorLine := fmt.Sprintf("Error - %v", networkBalance.Error)
+				contentParts = append(contentParts, NetworkStyle.Render(networkLine)+ErrorStyle.Render(errorLine))
 			} else {
-				// Convert wei to ether for display
 				balanceFloat := new(big.Float).SetInt(networkBalance.Amount)
 				divisor := new(big.Float).SetFloat64(math.Pow(10, float64(networkBalance.Decimals)))
 				balanceFloat.Quo(balanceFloat, divisor)
 
 				balanceStr := balanceFloat.Text('f', 6)
-				// Remove trailing zeros
 				balanceStr = strings.TrimRight(balanceStr, "0")
 				balanceStr = strings.TrimRight(balanceStr, ".")
 
-				b.WriteString(networkStyle.Render(fmt.Sprintf("  %s: ", networkBalance.NetworkName)))
-				b.WriteString(fmt.Sprintf("%s %s", balanceStr, networkBalance.Symbol))
+				networkLine := fmt.Sprintf("  %s: ", networkBalance.NetworkName)
+				balanceLine := fmt.Sprintf("%s %s", balanceStr, networkBalance.Symbol)
+				contentParts = append(contentParts, NetworkStyle.Render(networkLine)+ValueStyle.Render(balanceLine))
 			}
-			b.WriteString("\n")
 		}
 
 		updateTime := m.currentMultiBalance.UpdatedAt.Format("2006-01-02 15:04:05")
-		b.WriteString("\n")
-		b.WriteString(networkStyle.Render(fmt.Sprintf("Last updated: %s", updateTime)))
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, NetworkStyle.Render(fmt.Sprintf("Last updated: %s", updateTime)))
 	} else {
-		b.WriteString("Balance: Loading...")
+		contentParts = append(contentParts, InfoStyle.Render("Balance: Loading..."))
 	}
 
-	b.WriteString("\n\n")
-
+	// Error display
 	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n\n")
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, ErrorStyle.Render("Error: "+m.err.Error()))
 	}
 
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	// Create main content
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
+
+	// Footer
+	var footerText string
 	if m.showSensitiveInfo {
-		b.WriteString(footerStyle.Render("r: refresh balance • s: hide sensitive info • d: delete wallet • esc: back • q: quit"))
+		footerText = "r: refresh balance • s: hide sensitive info • d: delete wallet • esc: back • q: quit"
 	} else {
-		b.WriteString(footerStyle.Render("r: refresh balance • s: show sensitive info • d: delete wallet • esc: back • q: quit"))
+		footerText = "r: refresh balance • s: show sensitive info • d: delete wallet • esc: back • q: quit"
+	}
+	footer := FooterStyle.Render(footerText)
+
+	// Loading status (appears at bottom)
+	var loadingStatus string
+	if m.isLoading {
+		loadingText := m.loadingText
+		if loadingText == "" {
+			loadingText = "Loading..."
+		}
+		loadingStatus = LoadingStyle.Render(fmt.Sprintf("%s %s", m.loadingSpinner.View(), loadingText))
 	}
 
-	return b.String()
-}
+	// Combine all parts with proper spacing
+	var finalParts []string
+	finalParts = append(finalParts, mainContent)
 
-func (m Model) renderCreateWallet() string {
-	var b strings.Builder
-
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
-
-	b.WriteString(headerStyle.Render("➕ Create New Wallet"))
-	b.WriteString("\n\n")
-
-	b.WriteString("Fill in the details to create a new wallet:\n\n")
-
-	// Name input
-	b.WriteString("Wallet Name:\n")
-	b.WriteString(m.nameInput.View())
-	b.WriteString("\n\n")
-
-	// Password input
-	b.WriteString("Password:\n")
-	b.WriteString(m.passwordInput.View())
-	b.WriteString("\n\n")
-
-	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n\n")
+	// Add spacing before footer/loading
+	availableHeight := m.height - lipgloss.Height(mainContent) - 4
+	if availableHeight > 0 {
+		padding := strings.Repeat("\n", availableHeight)
+		finalParts = append(finalParts, padding)
 	}
 
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("tab: next field • enter: create wallet • esc: back • q: quit"))
-
-	return b.String()
-}
-
-func (m Model) renderImportWallet() string {
-	var b strings.Builder
-
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
-
-	b.WriteString(headerStyle.Render("📥 Import Wallet"))
-	b.WriteString("\n\n")
-
-	b.WriteString("Fill in the details to import an existing wallet:\n\n")
-
-	// Name input
-	b.WriteString("Wallet Name:\n")
-	b.WriteString(m.nameInput.View())
-	b.WriteString("\n\n")
-
-	// Password input
-	b.WriteString("Password:\n")
-	b.WriteString(m.passwordInput.View())
-	b.WriteString("\n\n")
-
-	// Mnemonic input
-	b.WriteString("Mnemonic Phrase (12 words):\n")
-	b.WriteString(m.mnemonicInput.View())
-	b.WriteString("\n\n")
-
-	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n\n")
+	// Add loading status if present
+	if loadingStatus != "" {
+		finalParts = append(finalParts, loadingStatus)
 	}
 
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("tab: next field • enter: import wallet • esc: back • q: quit"))
+	// Add footer
+	finalParts = append(finalParts, footer)
 
-	return b.String()
+	return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
 }
 
-func (m Model) renderImportPrivateKey() string {
-	var b strings.Builder
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
 
-	b.WriteString(headerStyle.Render("🔑 Import Wallet from Private Key"))
-	b.WriteString("\n\n")
-
-	b.WriteString("Fill in the details to import an existing wallet from a private key:\n\n")
-
-	// Name input
-	b.WriteString("Wallet Name:\n")
-	b.WriteString(m.nameInput.View())
-	b.WriteString("\n\n")
-
-	// Password input
-	b.WriteString("Password:\n")
-	b.WriteString(m.passwordInput.View())
-	b.WriteString("\n\n")
-
-	// Private Key input
-	b.WriteString("Private Key (without 0x prefix):\n")
-	b.WriteString(m.privateKeyInput.View())
-	b.WriteString("\n\n")
-
-	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n\n")
-	}
-
-	footerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(footerStyle.Render("tab: next field • enter: import wallet • esc: back • q: quit"))
-
-	return b.String()
-}
 
 // refreshNetworkItems updates the network items list
 func (m *Model) refreshNetworkItems() {
@@ -1260,4 +1422,85 @@ func (m *Model) refreshNetworkItems() {
 	}
 	networkItems = append(networkItems, "Add Custom Network", "Back to Settings")
 	m.networkItems = networkItems
+}
+
+// startLoading starts the loading spinner with a message
+func (m *Model) startLoading(text string) tea.Cmd {
+	m.isLoading = true
+	m.loadingText = text
+	return m.loadingSpinner.Tick
+}
+
+// stopLoading stops the loading spinner
+func (m *Model) stopLoading() {
+	m.isLoading = false
+	m.loadingText = ""
+}
+
+// setupWalletTable initializes the wallet table
+func (m *Model) setupWalletTable() {
+	// Calculate column widths dynamically based on screen width
+	availableWidth := m.width - 4 // Account for borders and padding
+	if availableWidth < 80 {
+		availableWidth = 80 // Minimum width
+	}
+
+	// Distribute width: Name(25%), Address(45%), Type(15%), Created(15%)
+	nameWidth := int(float64(availableWidth) * 0.25)
+	addressWidth := int(float64(availableWidth) * 0.45)
+	typeWidth := int(float64(availableWidth) * 0.15)
+	createdWidth := availableWidth - nameWidth - addressWidth - typeWidth
+
+	columns := []table.Column{
+		{Title: "Name", Width: nameWidth},
+		{Title: "Address", Width: addressWidth},
+		{Title: "Type", Width: typeWidth},
+		{Title: "Created", Width: createdWidth},
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows([]table.Row{}),
+		table.WithFocused(true),
+		table.WithHeight(10),
+		table.WithWidth(availableWidth),
+	)
+
+	// Apply consistent styling using existing style definitions
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#874BFD")).
+		BorderBottom(true).
+		Bold(true).
+		Foreground(lipgloss.Color("86"))
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("#FFF")).
+		Background(lipgloss.Color("#874BFD")).
+		Bold(true)
+	s.Cell = s.Cell.
+		Foreground(lipgloss.Color("250"))
+	t.SetStyles(s)
+
+	m.walletTable = t
+}
+
+// updateWalletTable updates the wallet table with current wallets
+func (m *Model) updateWalletTable() {
+	var rows []table.Row
+	for _, wallet := range m.wallets {
+		walletType := "Mnemonic"
+		if wallet.EncryptedMnemonic == "" {
+			walletType = "Private Key"
+		}
+
+		rows = append(rows, table.Row{
+			wallet.Name,
+			wallet.Address,
+			walletType,
+			wallet.CreatedAt.Format("2006-01-02 15:04"),
+		})
+	}
+
+	m.walletTable.SetRows(rows)
 }

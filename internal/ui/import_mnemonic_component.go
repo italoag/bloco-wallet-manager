@@ -4,47 +4,117 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ImportMnemonicComponent represents the mnemonic import component
 type ImportMnemonicComponent struct {
-	id            string
-	nameInput     textinput.Model
-	mnemonicInput textinput.Model
-	passwordInput textinput.Model
-	inputFocus    int
-	width         int
-	height        int
-	err           error
-	importing     bool
+	id        string
+	form      *huh.Form
+	width     int
+	height    int
+	err       error
+	importing bool
+
+	// Form values
+	walletName                                  string
+	word1, word2, word3, word4, word5, word6    string
+	word7, word8, word9, word10, word11, word12 string
+	password                                    string
 }
 
 // NewImportMnemonicComponent creates a new mnemonic import component
 func NewImportMnemonicComponent() ImportMnemonicComponent {
-	nameInput := textinput.New()
-	nameInput.Placeholder = "Enter wallet name..."
-	nameInput.Width = 40
-	nameInput.Focus()
-
-	mnemonicInput := textinput.New()
-	mnemonicInput.Placeholder = "Enter 12-word mnemonic phrase..."
-	mnemonicInput.Width = 60
-
-	passwordInput := textinput.New()
-	passwordInput.Placeholder = "Enter password..."
-	passwordInput.EchoMode = textinput.EchoPassword
-	passwordInput.Width = 40
-
-	return ImportMnemonicComponent{
-		id:            "import-mnemonic",
-		nameInput:     nameInput,
-		mnemonicInput: mnemonicInput,
-		passwordInput: passwordInput,
-		inputFocus:    0,
+	c := ImportMnemonicComponent{
+		id: "import-mnemonic",
 	}
+	c.initForm()
+	return c
+}
+
+// initForm initializes the huh form with proper layout for mnemonic words
+func (c *ImportMnemonicComponent) initForm() {
+	c.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Key("walletName").
+				Title("Wallet Name").
+				Placeholder("Enter wallet name...").
+				Value(&c.walletName),
+			huh.NewInput().
+				Key("password").
+				Title("Password").
+				Placeholder("Enter password...").
+				EchoMode(huh.EchoModePassword).
+				Value(&c.password),
+		),
+		huh.NewGroup(
+			huh.NewInput().
+				Key("word1").
+				Title("Word 1").
+				Placeholder("1st word").
+				Value(&c.word1),
+			huh.NewInput().
+				Key("word2").
+				Title("Word 2").
+				Placeholder("2nd word").
+				Value(&c.word2),
+			huh.NewInput().
+				Key("word3").
+				Title("Word 3").
+				Placeholder("3rd word").
+				Value(&c.word3),
+			huh.NewInput().
+				Key("word4").
+				Title("Word 4").
+				Placeholder("4th word").
+				Value(&c.word4),
+			huh.NewInput().
+				Key("word5").
+				Title("Word 5").
+				Placeholder("5th word").
+				Value(&c.word5),
+			huh.NewInput().
+				Key("word6").
+				Title("Word 6").
+				Placeholder("6th word").
+				Value(&c.word6),
+		),
+		huh.NewGroup(
+			huh.NewInput().
+				Key("word7").
+				Title("Word 7").
+				Placeholder("7th word").
+				Value(&c.word7),
+			huh.NewInput().
+				Key("word8").
+				Title("Word 8").
+				Placeholder("8th word").
+				Value(&c.word8),
+			huh.NewInput().
+				Key("word9").
+				Title("Word 9").
+				Placeholder("9th word").
+				Value(&c.word9),
+			huh.NewInput().
+				Key("word10").
+				Title("Word 10").
+				Placeholder("10th word").
+				Value(&c.word10),
+			huh.NewInput().
+				Key("word11").
+				Title("Word 11").
+				Placeholder("11th word").
+				Value(&c.word11),
+			huh.NewInput().
+				Key("word12").
+				Title("Word 12").
+				Placeholder("12th word").
+				Value(&c.word12),
+		),
+	).WithWidth(80).WithShowHelp(false).WithShowErrors(false).WithLayout(huh.LayoutColumns(2))
 }
 
 // SetSize updates the component size
@@ -69,30 +139,37 @@ func (c *ImportMnemonicComponent) SetImporting(importing bool) {
 
 // GetWalletName returns the entered wallet name
 func (c *ImportMnemonicComponent) GetWalletName() string {
-	return c.nameInput.Value()
+	return c.walletName
 }
 
 // GetMnemonic returns the entered mnemonic
 func (c *ImportMnemonicComponent) GetMnemonic() string {
-	return c.mnemonicInput.Value()
+	words := []string{
+		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
+		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
+	}
+	return strings.Join(words, " ")
 }
 
 // GetPassword returns the entered password
 func (c *ImportMnemonicComponent) GetPassword() string {
-	return c.passwordInput.Value()
+	return c.password
 }
 
 // Reset clears all inputs
 func (c *ImportMnemonicComponent) Reset() {
-	c.nameInput.SetValue("")
-	c.mnemonicInput.SetValue("")
-	c.passwordInput.SetValue("")
-	c.inputFocus = 0
+	c.walletName = ""
+	c.word1, c.word2, c.word3, c.word4, c.word5, c.word6 = "", "", "", "", "", ""
+	c.word7, c.word8, c.word9, c.word10, c.word11, c.word12 = "", "", "", "", "", ""
+	c.password = ""
 	c.err = nil
 	c.importing = false
-	c.nameInput.Focus()
-	c.mnemonicInput.Blur()
-	c.passwordInput.Blur()
+	c.initForm()
+}
+
+// Init initializes the component
+func (c *ImportMnemonicComponent) Init() tea.Cmd {
+	return c.form.Init()
 }
 
 // Update handles messages for the import mnemonic component
@@ -104,50 +181,6 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 		c.width = msg.Width
 		c.height = msg.Height
 
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, key.NewBinding(key.WithKeys("tab", "shift+tab", "enter", "up", "down"))):
-			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-				if c.inputFocus == 2 { // Password field, attempt to import wallet
-					if c.validateInputs() {
-						c.importing = true
-						return c, func() tea.Msg {
-							return ImportMnemonicRequestMsg{
-								Name:     c.nameInput.Value(),
-								Mnemonic: c.mnemonicInput.Value(),
-								Password: c.passwordInput.Value(),
-							}
-						}
-					}
-				} else {
-					// Move to next field
-					c.inputFocus++
-					if c.inputFocus > 2 {
-						c.inputFocus = 0
-					}
-				}
-			} else {
-				// Handle tab navigation
-				if key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab", "up"))) {
-					c.inputFocus--
-					if c.inputFocus < 0 {
-						c.inputFocus = 2
-					}
-				} else {
-					c.inputFocus++
-					if c.inputFocus > 2 {
-						c.inputFocus = 0
-					}
-				}
-			}
-
-			// Update focus
-			c.updateFocus()
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
-			return c, func() tea.Msg { return BackToMenuMsg{} }
-		}
-
 	case walletCreatedMsg:
 		c.Reset()
 		return c, func() tea.Msg { return BackToMenuMsg{} }
@@ -156,61 +189,60 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 		c.SetError(fmt.Errorf("%s", string(msg)))
 	}
 
-	// Update the focused input
-	var cmd tea.Cmd
-	switch c.inputFocus {
-	case 0:
-		c.nameInput, cmd = c.nameInput.Update(msg)
+	// Update the form first (allows typing and internal navigation)
+	form, cmd := c.form.Update(msg)
+	if f, ok := form.(*huh.Form); ok {
+		c.form = f
 		cmds = append(cmds, cmd)
-	case 1:
-		c.mnemonicInput, cmd = c.mnemonicInput.Update(msg)
-		cmds = append(cmds, cmd)
-	case 2:
-		c.passwordInput, cmd = c.passwordInput.Update(msg)
-		cmds = append(cmds, cmd)
+	}
+
+	// Only handle escape if form didn't handle it (when form is not focused on input)
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "esc" && c.form.State == huh.StateNormal {
+		return c, func() tea.Msg { return BackToMenuMsg{} }
+	}
+
+	// Check if form is completed
+	if c.form.State == huh.StateCompleted {
+		if c.validateInputs() {
+			c.importing = true
+			return c, func() tea.Msg {
+				return ImportMnemonicRequestMsg{
+					Name:     c.GetWalletName(),
+					Mnemonic: c.GetMnemonic(),
+					Password: c.GetPassword(),
+				}
+			}
+		}
+		// Reset form state if validation failed
+		c.form.State = huh.StateNormal
 	}
 
 	return c, tea.Batch(cmds...)
 }
 
-// updateFocus updates which input field has focus
-func (c *ImportMnemonicComponent) updateFocus() {
-	c.nameInput.Blur()
-	c.mnemonicInput.Blur()
-	c.passwordInput.Blur()
-
-	switch c.inputFocus {
-	case 0:
-		c.nameInput.Focus()
-	case 1:
-		c.mnemonicInput.Focus()
-	case 2:
-		c.passwordInput.Focus()
-	}
-}
-
 // validateInputs checks if the inputs are valid
 func (c *ImportMnemonicComponent) validateInputs() bool {
-	if strings.TrimSpace(c.nameInput.Value()) == "" {
+	if strings.TrimSpace(c.walletName) == "" {
 		c.err = fmt.Errorf("Wallet name cannot be empty")
 		return false
 	}
-	if strings.TrimSpace(c.mnemonicInput.Value()) == "" {
-		c.err = fmt.Errorf("Mnemonic phrase cannot be empty")
-		return false
-	}
-	if strings.TrimSpace(c.passwordInput.Value()) == "" {
+	if strings.TrimSpace(c.password) == "" {
 		c.err = fmt.Errorf("Password cannot be empty")
 		return false
 	}
-	
-	// Basic mnemonic validation
-	words := strings.Fields(strings.TrimSpace(c.mnemonicInput.Value()))
-	if len(words) != 12 && len(words) != 24 {
-		c.err = fmt.Errorf("Mnemonic must be 12 or 24 words")
-		return false
+
+	// Check if all 12 words are filled
+	words := []string{
+		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
+		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
 	}
-	
+	for i, word := range words {
+		if strings.TrimSpace(word) == "" {
+			c.err = fmt.Errorf("All 12 words must be filled (word %d is empty)", i+1)
+			return false
+		}
+	}
+
 	c.err = nil
 	return true
 }
@@ -219,56 +251,35 @@ func (c *ImportMnemonicComponent) validateInputs() bool {
 func (c *ImportMnemonicComponent) View() string {
 	var b strings.Builder
 
-	b.WriteString(HeaderStyle.Render("📥 Import Wallet from Mnemonic"))
+	// Header
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("86")).
+		MarginBottom(1)
+	b.WriteString(headerStyle.Render("📥 Import Wallet from Mnemonic"))
 	b.WriteString("\n\n")
 
-	// Name input
-	b.WriteString(LabelStyle.Render("Wallet Name:"))
-	b.WriteString("\n")
-	if c.inputFocus == 0 {
-		b.WriteString(FocusedInputStyle.Render(c.nameInput.View()))
-	} else {
-		b.WriteString(InputStyle.Render(c.nameInput.View()))
-	}
-	b.WriteString("\n\n")
-
-	// Mnemonic input
-	b.WriteString(LabelStyle.Render("Mnemonic Phrase (12 or 24 words):"))
-	b.WriteString("\n")
-	if c.inputFocus == 1 {
-		b.WriteString(FocusedInputStyle.Render(c.mnemonicInput.View()))
-	} else {
-		b.WriteString(InputStyle.Render(c.mnemonicInput.View()))
-	}
-	b.WriteString("\n\n")
-
-	// Password input
-	b.WriteString(LabelStyle.Render("Password:"))
-	b.WriteString("\n")
-	if c.inputFocus == 2 {
-		b.WriteString(FocusedInputStyle.Render(c.passwordInput.View()))
-	} else {
-		b.WriteString(InputStyle.Render(c.passwordInput.View()))
-	}
-	b.WriteString("\n\n")
+	// Form
+	b.WriteString(c.form.View())
 
 	// Status messages
 	if c.importing {
+		b.WriteString("\n")
 		b.WriteString(LoadingStyle.Render("⏳ Importing wallet..."))
-		b.WriteString("\n")
 	} else if c.err != nil {
-		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 		b.WriteString("\n")
+		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 	}
 
 	// Instructions
+	b.WriteString("\n\n")
 	b.WriteString(WarningStyle.Render("⚠️  Important: Make sure your mnemonic phrase is correct!"))
 	b.WriteString("\n")
-	b.WriteString(InfoStyle.Render("   Each word should be separated by a space."))
+	b.WriteString(InfoStyle.Render("   Enter each word in the correct order from 1-12."))
 	b.WriteString("\n\n")
 
 	// Footer
-	b.WriteString(FooterStyle.Render("Tab: Next Field • Enter: Import • Esc: Back"))
+	b.WriteString(FooterStyle.Render("Tab/Arrow Keys: Navigate • Enter: Import • Esc: Back"))
 
 	return b.String()
 }

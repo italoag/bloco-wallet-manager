@@ -120,7 +120,7 @@ func (m Model) handleEnterKey() (Model, tea.Cmd) {
 		case 0: // View Wallets
 			m.currentView = WalletListView
 			m.selected = 0
-			return m, m.loadWalletsCmd()
+			return m, tea.Batch(m.startLoading("Loading wallets..."), m.loadWalletsCmd())
 		case 1: // Create New Wallet
 			m.currentView = CreateWalletView
 			m.resetInputs()
@@ -145,24 +145,37 @@ func (m Model) handleEnterKey() (Model, tea.Cmd) {
 		}
 
 	case WalletListView:
-		if len(m.wallets) > 0 && m.selected < len(m.wallets) {
-			m.selectedWallet = m.wallets[m.selected]
+		if len(m.wallets) > 0 {
+			// Get selected row from table
+			selectedRow := m.walletTable.SelectedRow()
+			if len(selectedRow) > 1 {
+				selectedAddress := selectedRow[1]
+				// Find wallet by address
+				for _, wallet := range m.wallets {
+					if wallet.Address == selectedAddress {
+						m.selectedWallet = wallet
+						break
+					}
+				}
 
-			// Reset extracted private key when switching wallets
-			m.extractedPrivateKey = ""
+				if m.selectedWallet != nil {
+					// Reset extracted private key when switching wallets
+					m.extractedPrivateKey = ""
 
-			// Check if wallet needs authentication (has keystore)
-			if m.selectedWallet.KeyStorePath != "" {
-				m.needsWalletAuth = true
-				m.walletAuthPassword.Reset()
-				m.walletAuthPassword.Focus()
-				m.walletAuthError = ""
-				m.currentView = WalletAuthView
-				return m, nil
-			} else {
-				// Wallet doesn't need auth, go directly to details
-				m.currentView = WalletDetailsView
-				return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
+					// Check if wallet needs authentication (has keystore)
+					if m.selectedWallet.KeyStorePath != "" {
+						m.needsWalletAuth = true
+						m.walletAuthPassword.Reset()
+						m.walletAuthPassword.Focus()
+						m.walletAuthError = ""
+						m.currentView = WalletAuthView
+						return m, nil
+					} else {
+						// Wallet doesn't need auth, go directly to details
+						m.currentView = WalletDetailsView
+						return m, m.getMultiBalanceCmd(m.selectedWallet.Address)
+					}
+				}
 			}
 		}
 

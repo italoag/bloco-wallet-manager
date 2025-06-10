@@ -37,44 +37,8 @@ type UIConfig struct {
 	ShowSplash bool   `json:"show_splash"`
 }
 
-var DefaultNetworks = map[string]Network{
-	"ethereum": {
-		Name:        "Ethereum Mainnet",
-		RPCEndpoint: "https://eth.drpc.org",
-		ChainID:     1,
-		Symbol:      "ETH",
-		Explorer:    "https://etherscan.io",
-		IsActive:    true,
-		IsCustom:    false,
-	},
-	"polygon": {
-		Name:        "Polygon",
-		RPCEndpoint: "https://polygon-rpc.com",
-		ChainID:     137,
-		Symbol:      "POL",
-		Explorer:    "https://polygonscan.com",
-		IsActive:    false,
-		IsCustom:    false,
-	},
-	"bsc": {
-		Name:        "Binance Smart Chain",
-		RPCEndpoint: "https://bsc-dataseed.binance.org",
-		ChainID:     56,
-		Symbol:      "BNB",
-		Explorer:    "https://bscscan.com",
-		IsActive:    false,
-		IsCustom:    false,
-	},
-	"base": {
-		Name:        "Base",
-		RPCEndpoint: "https://mainnet.base.org",
-		ChainID:     8453,
-		Symbol:      "ETH",
-		Explorer:    "https://basescan.org",
-		IsActive:    false,
-		IsCustom:    false,
-	},
-}
+// DefaultNetworks is now empty - users must add their own networks
+var DefaultNetworks = map[string]Network{}
 
 var SupportedLanguages = map[string]string{
 	"en": "English",
@@ -160,14 +124,17 @@ func getConfigPath() string {
 }
 
 func (c *Config) GetActiveNetwork() *Network {
+	// Check regular networks
 	for _, network := range c.Networks {
 		if network.IsActive {
 			return &network
 		}
 	}
-	// Retorna Ethereum como padrão se nenhuma estiver ativa
-	if eth, exists := c.Networks["ethereum"]; exists {
-		return &eth
+	// Check custom networks
+	for _, network := range c.CustomNetworks {
+		if network.IsActive {
+			return &network
+		}
 	}
 	return nil
 }
@@ -235,7 +202,7 @@ func (c *Config) GetRPCEndpoint() string {
 	if activeNetwork := c.GetActiveNetwork(); activeNetwork != nil {
 		return activeNetwork.RPCEndpoint
 	}
-	return "https://eth.drpc.org"
+	return "" // No default RPC - user must add networks
 }
 
 func (c *Config) AddCustomNetwork(key string, network Network) {

@@ -4,41 +4,51 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // CreateWalletComponent represents the wallet creation component
 type CreateWalletComponent struct {
-	id           string
-	nameInput    textinput.Model
-	passwordInput textinput.Model
-	inputFocus   int
-	width        int
-	height       int
-	err          error
-	creating     bool
+	id       string
+	form     *huh.Form
+	width    int
+	height   int
+	err      error
+	creating bool
+
+	// Form values
+	walletName string
+	password   string
 }
 
 // NewCreateWalletComponent creates a new wallet creation component
 func NewCreateWalletComponent() CreateWalletComponent {
-	nameInput := textinput.New()
-	nameInput.Placeholder = "Enter wallet name..."
-	nameInput.Width = 40
-	nameInput.Focus()
-
-	passwordInput := textinput.New()
-	passwordInput.Placeholder = "Enter password..."
-	passwordInput.EchoMode = textinput.EchoPassword
-	passwordInput.Width = 40
-
-	return CreateWalletComponent{
-		id:            "create-wallet",
-		nameInput:     nameInput,
-		passwordInput: passwordInput,
-		inputFocus:    0,
+	c := CreateWalletComponent{
+		id: "create-wallet",
 	}
+	c.initForm()
+	return c
+}
+
+// initForm initializes the huh form
+func (c *CreateWalletComponent) initForm() {
+	c.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Key("walletName").
+				Title("Wallet Name").
+				Placeholder("Enter wallet name...").
+				Value(&c.walletName),
+			huh.NewInput().
+				Key("password").
+				Title("Password").
+				Placeholder("Enter password...").
+				EchoMode(huh.EchoModePassword).
+				Value(&c.password),
+		),
+	).WithWidth(60).WithShowHelp(false).WithShowErrors(false)
 }
 
 // SetSize updates the component size
@@ -63,23 +73,26 @@ func (c *CreateWalletComponent) SetCreating(creating bool) {
 
 // GetWalletName returns the entered wallet name
 func (c *CreateWalletComponent) GetWalletName() string {
-	return c.nameInput.Value()
+	return c.walletName
 }
 
 // GetPassword returns the entered password
 func (c *CreateWalletComponent) GetPassword() string {
-	return c.passwordInput.Value()
+	return c.password
 }
 
 // Reset clears all inputs
 func (c *CreateWalletComponent) Reset() {
-	c.nameInput.SetValue("")
-	c.passwordInput.SetValue("")
-	c.inputFocus = 0
+	c.walletName = ""
+	c.password = ""
 	c.err = nil
 	c.creating = false
-	c.nameInput.Focus()
-	c.passwordInput.Blur()
+	c.initForm()
+}
+
+// Init initializes the component
+func (c *CreateWalletComponent) Init() tea.Cmd {
+	return c.form.Init()
 }
 
 // Update handles messages for the create wallet component
@@ -92,51 +105,8 @@ func (c *CreateWalletComponent) Update(msg tea.Msg) (*CreateWalletComponent, tea
 		c.height = msg.Height
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, key.NewBinding(key.WithKeys("tab", "shift+tab", "enter", "up", "down"))):
-			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-				if c.inputFocus == 1 { // Password field, attempt to create wallet
-					if c.validateInputs() {
-						c.creating = true
-						return c, func() tea.Msg {
-							return CreateWalletRequestMsg{
-								Name:     c.nameInput.Value(),
-								Password: c.passwordInput.Value(),
-							}
-						}
-					}
-				} else {
-					// Move to next field
-					c.inputFocus++
-					if c.inputFocus > 1 {
-						c.inputFocus = 0
-					}
-				}
-			} else {
-				// Handle tab navigation
-				if key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab", "up"))) {
-					c.inputFocus--
-					if c.inputFocus < 0 {
-						c.inputFocus = 1
-					}
-				} else {
-					c.inputFocus++
-					if c.inputFocus > 1 {
-						c.inputFocus = 0
-					}
-				}
-			}
-
-			// Update focus
-			if c.inputFocus == 0 {
-				c.nameInput.Focus()
-				c.passwordInput.Blur()
-			} else {
-				c.nameInput.Blur()
-				c.passwordInput.Focus()
-			}
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+		switch msg.String() {
+		case "esc":
 			return c, func() tea.Msg { return BackToMenuMsg{} }
 		}
 
@@ -148,14 +118,26 @@ func (c *CreateWalletComponent) Update(msg tea.Msg) (*CreateWalletComponent, tea
 		c.SetError(fmt.Errorf("%s", string(msg)))
 	}
 
-	// Update the focused input
-	var cmd tea.Cmd
-	if c.inputFocus == 0 {
-		c.nameInput, cmd = c.nameInput.Update(msg)
+	// Update the form
+	form, cmd := c.form.Update(msg)
+	if f, ok := form.(*huh.Form); ok {
+		c.form = f
 		cmds = append(cmds, cmd)
-	} else {
-		c.passwordInput, cmd = c.passwordInput.Update(msg)
-		cmds = append(cmds, cmd)
+	}
+
+	// Check if form is completed
+	if c.form.State == huh.StateCompleted {
+		if c.validateInputs() {
+			c.creating = true
+			return c, func() tea.Msg {
+				return CreateWalletRequestMsg{
+					Name:     c.GetWalletName(),
+					Password: c.GetPassword(),
+				}
+			}
+		}
+		// Reset form state if validation failed
+		c.form.State = huh.StateNormal
 	}
 
 	return c, tea.Batch(cmds...)
@@ -163,11 +145,11 @@ func (c *CreateWalletComponent) Update(msg tea.Msg) (*CreateWalletComponent, tea
 
 // validateInputs checks if the inputs are valid
 func (c *CreateWalletComponent) validateInputs() bool {
-	if strings.TrimSpace(c.nameInput.Value()) == "" {
+	if strings.TrimSpace(c.walletName) == "" {
 		c.err = fmt.Errorf("Wallet name cannot be empty")
 		return false
 	}
-	if strings.TrimSpace(c.passwordInput.Value()) == "" {
+	if strings.TrimSpace(c.password) == "" {
 		c.err = fmt.Errorf("Password cannot be empty")
 		return false
 	}
@@ -179,46 +161,35 @@ func (c *CreateWalletComponent) validateInputs() bool {
 func (c *CreateWalletComponent) View() string {
 	var b strings.Builder
 
-	b.WriteString(HeaderStyle.Render("➕ Create New Wallet"))
+	// Header
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("86")).
+		MarginBottom(1)
+	b.WriteString(headerStyle.Render("➕ Create New Wallet"))
 	b.WriteString("\n\n")
 
-	// Name input
-	b.WriteString(LabelStyle.Render("Wallet Name:"))
-	b.WriteString("\n")
-	if c.inputFocus == 0 {
-		b.WriteString(FocusedInputStyle.Render(c.nameInput.View()))
-	} else {
-		b.WriteString(InputStyle.Render(c.nameInput.View()))
-	}
-	b.WriteString("\n\n")
-
-	// Password input
-	b.WriteString(LabelStyle.Render("Password:"))
-	b.WriteString("\n")
-	if c.inputFocus == 1 {
-		b.WriteString(FocusedInputStyle.Render(c.passwordInput.View()))
-	} else {
-		b.WriteString(InputStyle.Render(c.passwordInput.View()))
-	}
-	b.WriteString("\n\n")
+	// Form
+	b.WriteString(c.form.View())
 
 	// Status messages
 	if c.creating {
+		b.WriteString("\n")
 		b.WriteString(LoadingStyle.Render("⏳ Creating wallet..."))
-		b.WriteString("\n")
 	} else if c.err != nil {
-		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 		b.WriteString("\n")
+		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 	}
 
 	// Instructions
+	b.WriteString("\n\n")
 	b.WriteString(InfoStyle.Render("💡 Your wallet will be secured with a mnemonic phrase."))
 	b.WriteString("\n")
 	b.WriteString(InfoStyle.Render("   Make sure to save it in a secure location!"))
 	b.WriteString("\n\n")
 
 	// Footer
-	b.WriteString(FooterStyle.Render("Tab: Next Field • Enter: Create • Esc: Back"))
+	b.WriteString(FooterStyle.Render("Tab/Arrow Keys: Navigate • Enter: Create • Esc: Back"))
 
 	return b.String()
 }

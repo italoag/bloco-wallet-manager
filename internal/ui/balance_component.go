@@ -11,14 +11,14 @@ import (
 
 // BalanceComponent represents the balance display component
 type BalanceComponent struct {
-	id              string
-	selectedWallet  *wallet.Wallet
-	balance         *wallet.Balance
-	multiBalance    *wallet.MultiNetworkBalance
-	loading         bool
-	err             error
-	width           int
-	height          int
+	id             string
+	selectedWallet *wallet.Wallet
+	balance        *wallet.Balance
+	multiBalance   *wallet.MultiNetworkBalance
+	loading        bool
+	err            error
+	width          int
+	height         int
 }
 
 // NewBalanceComponent creates a new balance component

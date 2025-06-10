@@ -5,6 +5,8 @@ import (
 	"blocowallet/internal/wallet"
 	"blocowallet/pkg/config"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/digitallyserviced/tdfgo/tdf"
 )
@@ -44,13 +46,23 @@ type Model struct {
 	config *config.Config
 
 	// Components
-	splashComponent          SplashComponent
-	mainMenuComponent        MainMenuComponent
-	walletListComponent      WalletListComponent
-	balanceComponent         BalanceComponent
-	createWalletComponent    CreateWalletComponent
-	importMnemonicComponent  ImportMnemonicComponent
+	splashComponent           SplashComponent
+	mainMenuComponent         MainMenuComponent
+	settingsMenuComponent     SettingsMenuComponent
+	networkListComponent      NetworkListComponent
+	addNetworkComponent       AddNetworkComponent
+	languageMenuComponent     LanguageMenuComponent
+	walletListComponent       WalletListComponent
+	balanceComponent          BalanceComponent
+	createWalletComponent     CreateWalletComponent
+	importMnemonicComponent   ImportMnemonicComponent
 	importPrivateKeyComponent ImportPrivateKeyComponent
+
+	// Loading and table components
+	loadingSpinner spinner.Model
+	isLoading      bool
+	loadingText    string
+	walletTable    table.Model
 
 	// Legacy input fields (to be removed gradually)
 	nameInput       textinput.Model

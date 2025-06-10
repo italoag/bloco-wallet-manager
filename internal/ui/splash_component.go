@@ -99,7 +99,7 @@ func (c *SplashComponent) View() string {
 	var b strings.Builder
 
 	// Calculate vertical centering
-	logoHeight := 8 // Approximate height of ASCII logo
+	logoHeight := 8                // Approximate height of ASCII logo
 	totalHeight := logoHeight + 10 // Logo + spacing + other elements
 	topPadding := (c.height - totalHeight) / 2
 	if topPadding < 0 {
@@ -116,7 +116,7 @@ func (c *SplashComponent) View() string {
 	if c.selectedFont != nil {
 		// Initialize string renderer for the selected font
 		fontString := tdf.NewTheDrawFontStringFont(c.selectedFont)
-		
+
 		// Render the logo using TDF font
 		renderedLogo := fontString.RenderString("BlockoWallet")
 		if renderedLogo != "" {
@@ -175,7 +175,7 @@ func (c *SplashComponent) createProgressBar() string {
 	empty := width - filled
 
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", empty)
-	
+
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("86")).
 		Render("▕" + bar + "▏")

@@ -34,3 +34,5 @@ go.work.sum
 /wallets.db
 bin/blocowallet
 changelog/
+references/
+bin/

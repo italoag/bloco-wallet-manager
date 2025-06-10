@@ -3,18 +3,53 @@ package ui
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"blocowallet/pkg/config"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// createFriendlyErrorMsg creates user-friendly error messages
+func createFriendlyErrorMsg(operation string, err error) errorMsg {
+	errStr := err.Error()
+	errLower := strings.ToLower(errStr)
+
+	// Check for common network-related errors
+	if strings.Contains(errLower, "connection") ||
+		strings.Contains(errLower, "timeout") ||
+		strings.Contains(errLower, "network") ||
+		strings.Contains(errLower, "no such host") ||
+		strings.Contains(errLower, "connection refused") ||
+		strings.Contains(errLower, "dial tcp") {
+		return errorMsg(fmt.Sprintf("🌐 Connection Problem: Unable to %s. Please check your internet connection and try again.", operation))
+	}
+
+	// Check for RPC errors
+	if strings.Contains(errLower, "rpc") || strings.Contains(errLower, "endpoint") {
+		return errorMsg(fmt.Sprintf("🔌 RPC Error: Unable to %s. The blockchain network may be temporarily unavailable.", operation))
+	}
+
+	// Check for authentication errors
+	if strings.Contains(errLower, "unauthorized") || strings.Contains(errLower, "forbidden") {
+		return errorMsg(fmt.Sprintf("🔐 Authentication Error: Unable to %s. Please check your credentials.", operation))
+	}
+
+	// Check for rate limiting
+	if strings.Contains(errLower, "rate limit") || strings.Contains(errLower, "too many requests") {
+		return errorMsg(fmt.Sprintf("⏱️ Rate Limited: Too many requests. Please wait a moment before trying to %s again.", operation))
+	}
+
+	// Generic error with context
+	return errorMsg(fmt.Sprintf("❌ Error: Unable to %s. %s", operation, errStr))
+}
+
 // loadWalletsCmd loads all wallets from the service
 func (m Model) loadWalletsCmd() tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		wallets, err := m.walletService.List(context.Background())
 		if err != nil {
-			return errorMsg(err.Error())
+			return createFriendlyErrorMsg("load wallets", err)
 		}
 		return walletsLoadedMsg(wallets)
 	})
@@ -25,7 +60,7 @@ func (m Model) getBalanceCmd(address string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		balance, err := m.walletService.GetBalance(context.Background(), address)
 		if err != nil {
-			return errorMsg(err.Error())
+			return createFriendlyErrorMsg("fetch wallet balance", err)
 		}
 		return balanceLoadedMsg(balance)
 	})
@@ -36,7 +71,7 @@ func (m Model) getMultiBalanceCmd(address string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		multiBalance, err := m.walletService.GetMultiNetworkBalance(context.Background(), address)
 		if err != nil {
-			return errorMsg(err.Error())
+			return createFriendlyErrorMsg("fetch wallet balances", err)
 		}
 		return multiBalanceLoadedMsg(multiBalance)
 	})
@@ -76,11 +111,6 @@ func (m Model) importWalletFromPrivateKeyCmd(name, password, privateKey string) 
 }
 
 // Message types for network operations
-type networkAddedMsg struct {
-	key     string
-	network config.Network
-}
-
 type networkErrorMsg string
 
 // addNetworkCmd adds a custom network using ChainList API with retry
@@ -95,7 +125,8 @@ func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
 		// Get chain info with retry mechanism
 		chainInfo, workingRPC, err := m.chainListService.GetChainInfoWithRetry(chainID)
 		if err != nil {
-			return networkErrorMsg("Failed to fetch chain info: " + err.Error())
+			friendlyErr := createFriendlyErrorMsg("fetch chain information", err)
+			return networkErrorMsg(string(friendlyErr))
 		}
 
 		// Use the working RPC from chainlist if no custom RPC provided
@@ -135,7 +166,7 @@ func (m Model) searchNetworksCmd(query string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		suggestions, err := m.chainListService.SearchNetworksByName(query)
 		if err != nil {
-			return errorMsg("Failed to search networks: " + err.Error())
+			return createFriendlyErrorMsg("search networks", err)
 		}
 		return networkSuggestionsMsg(suggestions)
 	})
@@ -146,7 +177,7 @@ func (m Model) loadChainInfoByIDCmd(chainID int) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		chainInfo, rpcURL, err := m.chainListService.GetChainInfoWithRetry(chainID)
 		if err != nil {
-			return errorMsg("Failed to load chain info: " + err.Error())
+			return createFriendlyErrorMsg("load chain information", err)
 		}
 		return chainInfoLoadedMsg{
 			chainInfo: chainInfo,

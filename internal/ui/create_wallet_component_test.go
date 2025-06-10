@@ -6,422 +6,341 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 )
 
 func TestNewCreateWalletComponent(t *testing.T) {
 	component := NewCreateWalletComponent()
 
+	// Test that component is properly initialized
 	if component.id != "create-wallet" {
 		t.Errorf("Expected id to be 'create-wallet', got %s", component.id)
 	}
 
-	if component.inputFocus != 0 {
-		t.Errorf("Expected initial inputFocus to be 0, got %d", component.inputFocus)
+	if component.form == nil {
+		t.Error("Expected form to be initialized")
 	}
 
-	if component.creating {
-		t.Error("Expected component to not be in creating state initially")
+	// Test initial values
+	if component.walletName != "" {
+		t.Errorf("Expected empty wallet name, got %s", component.walletName)
 	}
 
-	if component.err != nil {
-		t.Errorf("Expected no initial error, got %v", component.err)
-	}
-
-	// Test input configurations
-	if component.nameInput.Placeholder != "Enter wallet name..." {
-		t.Errorf("Expected nameInput placeholder to be 'Enter wallet name...', got %s", component.nameInput.Placeholder)
-	}
-
-	if component.passwordInput.Placeholder != "Enter password..." {
-		t.Errorf("Expected passwordInput placeholder to be 'Enter password...', got %s", component.passwordInput.Placeholder)
+	if component.password != "" {
+		t.Errorf("Expected empty password, got %s", component.password)
 	}
 }
 
 func TestCreateWalletComponent_SetSize(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	component.SetSize(800, 600)
-
-	if component.width != 800 {
-		t.Errorf("Expected width to be 800, got %d", component.width)
+	
+	component.SetSize(100, 50)
+	
+	if component.width != 100 {
+		t.Errorf("Expected width 100, got %d", component.width)
 	}
-
-	if component.height != 600 {
-		t.Errorf("Expected height to be 600, got %d", component.height)
+	
+	if component.height != 50 {
+		t.Errorf("Expected height 50, got %d", component.height)
 	}
 }
 
 func TestCreateWalletComponent_SetError(t *testing.T) {
 	component := NewCreateWalletComponent()
-	component.creating = true
-
 	testError := fmt.Errorf("test error")
+	
 	component.SetError(testError)
-
+	
 	if component.err == nil {
 		t.Error("Expected error to be set")
 	}
-
+	
+	if component.err.Error() != "test error" {
+		t.Errorf("Expected 'test error', got %s", component.err.Error())
+	}
+	
 	if component.creating {
-		t.Error("Expected creating to be false after setting error")
+		t.Error("Expected creating to be false when error is set")
 	}
 }
 
 func TestCreateWalletComponent_SetCreating(t *testing.T) {
 	component := NewCreateWalletComponent()
-	component.err = fmt.Errorf("test error")
-
+	
 	component.SetCreating(true)
-
+	
 	if !component.creating {
 		t.Error("Expected creating to be true")
 	}
-
+	
 	if component.err != nil {
-		t.Error("Expected error to be cleared when setting creating to true")
-	}
-
-	component.SetCreating(false)
-
-	if component.creating {
-		t.Error("Expected creating to be false")
+		t.Error("Expected error to be nil when creating is set to true")
 	}
 }
 
-func TestCreateWalletComponent_GetMethods(t *testing.T) {
+func TestCreateWalletComponent_GetWalletName(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	// Set test values
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-
-	if component.GetWalletName() != "test-wallet" {
-		t.Errorf("Expected wallet name to be 'test-wallet', got %s", component.GetWalletName())
+	
+	// Set wallet name
+	component.walletName = "test wallet"
+	
+	if component.GetWalletName() != "test wallet" {
+		t.Errorf("Expected 'test wallet', got %s", component.GetWalletName())
 	}
+}
 
-	if component.GetPassword() != "test-password" {
-		t.Errorf("Expected password to be 'test-password', got %s", component.GetPassword())
+func TestCreateWalletComponent_GetPassword(t *testing.T) {
+	component := NewCreateWalletComponent()
+	
+	// Set password
+	component.password = "password123"
+	
+	if component.GetPassword() != "password123" {
+		t.Errorf("Expected 'password123', got %s", component.GetPassword())
 	}
 }
 
 func TestCreateWalletComponent_Reset(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	// Set some values and state
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-	component.inputFocus = 1
-	component.err = fmt.Errorf("test error")
+	
+	// Set some values
+	component.walletName = "test"
+	component.password = "password"
+	component.err = fmt.Errorf("error")
 	component.creating = true
-
+	
 	component.Reset()
-
-	if component.GetWalletName() != "" {
-		t.Error("Expected wallet name to be empty after reset")
+	
+	// All values should be reset
+	if component.walletName != "" {
+		t.Errorf("Expected empty wallet name after reset, got %s", component.walletName)
 	}
-
-	if component.GetPassword() != "" {
-		t.Error("Expected password to be empty after reset")
+	
+	if component.password != "" {
+		t.Errorf("Expected empty password after reset, got %s", component.password)
 	}
-
-	if component.inputFocus != 0 {
-		t.Errorf("Expected inputFocus to be 0 after reset, got %d", component.inputFocus)
-	}
-
+	
 	if component.err != nil {
-		t.Error("Expected error to be nil after reset")
+		t.Error("Expected nil error after reset")
 	}
-
+	
 	if component.creating {
 		t.Error("Expected creating to be false after reset")
 	}
 }
 
-func TestCreateWalletComponent_Update_WindowSize(t *testing.T) {
+func TestCreateWalletComponent_ValidateInputs(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	msg := tea.WindowSizeMsg{Width: 1024, Height: 768}
-
-	updatedComponent, _ := component.Update(msg)
-
-	if updatedComponent.width != 1024 {
-		t.Errorf("Expected width to be 1024, got %d", updatedComponent.width)
+	
+	// Test empty wallet name
+	if component.validateInputs() {
+		t.Error("Expected validation to fail with empty wallet name")
 	}
-
-	if updatedComponent.height != 768 {
-		t.Errorf("Expected height to be 768, got %d", updatedComponent.height)
+	
+	// Set wallet name
+	component.walletName = "test wallet"
+	
+	// Test empty password
+	if component.validateInputs() {
+		t.Error("Expected validation to fail with empty password")
+	}
+	
+	// Set password
+	component.password = "password123"
+	
+	// Now validation should pass
+	if !component.validateInputs() {
+		t.Error("Expected validation to pass with all fields filled")
 	}
 }
 
-func TestCreateWalletComponent_Update_TabNavigation(t *testing.T) {
+func TestCreateWalletComponent_Update(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	// Test forward tab navigation
-	tabMsg := tea.KeyMsg{Type: tea.KeyTab}
-
-	updatedComponent, _ := component.Update(tabMsg)
-	if updatedComponent.inputFocus != 1 {
-		t.Errorf("Expected inputFocus to be 1 after tab, got %d", updatedComponent.inputFocus)
+	
+	// Test window size message
+	windowMsg := tea.WindowSizeMsg{Width: 120, Height: 60}
+	updatedComponent, _ := component.Update(windowMsg)
+	
+	if updatedComponent.width != 120 {
+		t.Errorf("Expected width 120, got %d", updatedComponent.width)
 	}
-
-	updatedComponent, _ = updatedComponent.Update(tabMsg)
-	if updatedComponent.inputFocus != 0 {
-		t.Errorf("Expected inputFocus to wrap to 0 after second tab, got %d", updatedComponent.inputFocus)
+	
+	if updatedComponent.height != 60 {
+		t.Errorf("Expected height 60, got %d", updatedComponent.height)
 	}
 }
 
-func TestCreateWalletComponent_Update_ShiftTabNavigation(t *testing.T) {
+func TestCreateWalletComponent_EscapeKey(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	// Test reverse tab navigation
-	shiftTabMsg := tea.KeyMsg{Type: tea.KeyShiftTab}
-
-	updatedComponent, _ := component.Update(shiftTabMsg)
-	if updatedComponent.inputFocus != 1 {
-		t.Errorf("Expected inputFocus to wrap to 1 after shift+tab, got %d", updatedComponent.inputFocus)
+	
+	// Test escape key
+	keyMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	_, cmd := component.Update(keyMsg)
+	
+	// Should return BackToMenuMsg
+	if cmd == nil {
+		t.Error("Expected command from escape key")
 	}
-
-	updatedComponent, _ = updatedComponent.Update(shiftTabMsg)
-	if updatedComponent.inputFocus != 0 {
-		t.Errorf("Expected inputFocus to be 0 after second shift+tab, got %d", updatedComponent.inputFocus)
+	
+	msg := cmd()
+	if _, ok := msg.(BackToMenuMsg); !ok {
+		t.Error("Expected BackToMenuMsg from escape key")
 	}
 }
 
-func TestCreateWalletComponent_Update_EnterOnPasswordField(t *testing.T) {
+func TestCreateWalletComponent_FormCompletion(t *testing.T) {
 	component := NewCreateWalletComponent()
-
-	// Set valid inputs
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-	component.inputFocus = 1 // Password field
-
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-
-	updatedComponent, cmd := component.Update(enterMsg)
-
+	
+	// Fill valid data
+	component.walletName = "test wallet"
+	component.password = "password123"
+	
+	// Set form state to completed
+	component.form.State = huh.StateCompleted
+	
+	// Update should trigger wallet creation
+	updatedComponent, cmd := component.Update(tea.KeyMsg{})
+	
 	if !updatedComponent.creating {
-		t.Error("Expected component to be in creating state after valid enter")
+		t.Error("Expected creating to be true after form completion")
 	}
-
+	
 	if cmd == nil {
-		t.Error("Expected command to be returned after valid enter")
+		t.Error("Expected command from form completion")
+	}
+	
+	// Execute command to check message type
+	msg := cmd()
+	if createMsg, ok := msg.(CreateWalletRequestMsg); ok {
+		if createMsg.Name != "test wallet" {
+			t.Errorf("Expected name 'test wallet', got %s", createMsg.Name)
+		}
+		if createMsg.Password != "password123" {
+			t.Errorf("Expected password 'password123', got %s", createMsg.Password)
+		}
+	} else {
+		t.Error("Expected CreateWalletRequestMsg from form completion")
 	}
 }
 
-func TestCreateWalletComponent_Update_EnterOnNameField(t *testing.T) {
+func TestCreateWalletComponent_FormCompletionValidationFails(t *testing.T) {
 	component := NewCreateWalletComponent()
-	component.inputFocus = 0 // Name field
-
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-
-	updatedComponent, _ := component.Update(enterMsg)
-
-	if updatedComponent.inputFocus != 1 {
-		t.Errorf("Expected inputFocus to move to 1 after enter on name field, got %d", updatedComponent.inputFocus)
-	}
-}
-
-func TestCreateWalletComponent_Update_EscapeKey(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
-
-	_, cmd := component.Update(escMsg)
-
-	if cmd == nil {
-		t.Error("Expected command to be returned after escape key")
-	}
-}
-
-func TestCreateWalletComponent_Update_WalletCreatedMsg(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	// Set some initial state
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-	component.inputFocus = 1
-	component.creating = true
-
-	walletCreatedMsg := walletCreatedMsg{}
-
-	updatedComponent, cmd := component.Update(walletCreatedMsg)
-
-	// Should reset the component
-	if updatedComponent.GetWalletName() != "" {
-		t.Error("Expected wallet name to be reset after walletCreatedMsg")
-	}
-
-	if updatedComponent.GetPassword() != "" {
-		t.Error("Expected password to be reset after walletCreatedMsg")
-	}
-
-	if updatedComponent.inputFocus != 0 {
-		t.Error("Expected inputFocus to be reset to 0 after walletCreatedMsg")
-	}
-
+	
+	// Don't fill data (validation should fail)
+	component.walletName = ""
+	component.password = ""
+	
+	// Set form state to completed
+	component.form.State = huh.StateCompleted
+	
+	// Update should not trigger wallet creation due to validation failure
+	updatedComponent, cmd := component.Update(tea.KeyMsg{})
+	
 	if updatedComponent.creating {
-		t.Error("Expected creating to be false after walletCreatedMsg")
+		t.Error("Expected creating to be false when validation fails")
 	}
-
-	if cmd == nil {
-		t.Error("Expected BackToMenuMsg command to be returned after walletCreatedMsg")
+	
+	// Form state should be reset to normal
+	if updatedComponent.form.State != huh.StateNormal {
+		t.Error("Expected form state to be reset to normal after validation failure")
+	}
+	
+	// Should not return a creation command
+	if cmd != nil {
+		msg := cmd()
+		if _, ok := msg.(CreateWalletRequestMsg); ok {
+			t.Error("Expected no CreateWalletRequestMsg when validation fails")
+		}
 	}
 }
 
-func TestCreateWalletComponent_Update_ErrorMsg(t *testing.T) {
+func TestCreateWalletComponent_WalletCreatedMessage(t *testing.T) {
 	component := NewCreateWalletComponent()
+	
+	// Set some state
 	component.creating = true
+	component.walletName = "test"
+	component.password = "password"
+	
+	// Simulate wallet created message
+	updatedComponent, cmd := component.Update(walletCreatedMsg{})
+	
+	// Component should be reset
+	if updatedComponent.walletName != "" {
+		t.Error("Expected wallet name to be reset after wallet created")
+	}
+	
+	if updatedComponent.password != "" {
+		t.Error("Expected password to be reset after wallet created")
+	}
+	
+	if updatedComponent.creating {
+		t.Error("Expected creating to be false after wallet created")
+	}
+	
+	// Should return BackToMenuMsg
+	if cmd == nil {
+		t.Error("Expected command from wallet created message")
+	}
+	
+	msg := cmd()
+	if _, ok := msg.(BackToMenuMsg); !ok {
+		t.Error("Expected BackToMenuMsg from wallet created")
+	}
+}
 
-	errorMsg := errorMsg("Test error message")
-
-	updatedComponent, _ := component.Update(errorMsg)
-
+func TestCreateWalletComponent_ErrorMessage(t *testing.T) {
+	component := NewCreateWalletComponent()
+	
+	// Simulate error message
+	updatedComponent, _ := component.Update(errorMsg("test error"))
+	
 	if updatedComponent.err == nil {
-		t.Error("Expected error to be set after errorMsg")
+		t.Error("Expected error to be set")
 	}
-
-	if updatedComponent.creating {
-		t.Error("Expected creating to be false after errorMsg")
-	}
-}
-
-func TestCreateWalletComponent_ValidateInputs_EmptyName(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	component.nameInput.SetValue("")
-	component.passwordInput.SetValue("test-password")
-
-	isValid := component.validateInputs()
-
-	if isValid {
-		t.Error("Expected validation to fail for empty name")
-	}
-
-	if component.err == nil {
-		t.Error("Expected error to be set for empty name")
+	
+	if updatedComponent.err.Error() != "test error" {
+		t.Errorf("Expected 'test error', got %s", updatedComponent.err.Error())
 	}
 }
 
-func TestCreateWalletComponent_ValidateInputs_EmptyPassword(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("")
-
-	isValid := component.validateInputs()
-
-	if isValid {
-		t.Error("Expected validation to fail for empty password")
-	}
-
-	if component.err == nil {
-		t.Error("Expected error to be set for empty password")
-	}
-}
-
-func TestCreateWalletComponent_ValidateInputs_WhitespaceOnly(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	component.nameInput.SetValue("   ")
-	component.passwordInput.SetValue("   ")
-
-	isValid := component.validateInputs()
-
-	if isValid {
-		t.Error("Expected validation to fail for whitespace-only inputs")
-	}
-
-	if component.err == nil {
-		t.Error("Expected error to be set for whitespace-only inputs")
-	}
-}
-
-func TestCreateWalletComponent_ValidateInputs_Valid(t *testing.T) {
-	component := NewCreateWalletComponent()
-
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-
-	isValid := component.validateInputs()
-
-	if !isValid {
-		t.Error("Expected validation to pass for valid inputs")
-	}
-
-	if component.err != nil {
-		t.Errorf("Expected no error for valid inputs, got %v", component.err)
-	}
-}
-
-func TestCreateWalletComponent_View_Basic(t *testing.T) {
+func TestCreateWalletComponent_View(t *testing.T) {
 	component := NewCreateWalletComponent()
 	component.SetSize(80, 24)
-
+	
 	view := component.View()
-
-	if !strings.Contains(view, "➕ Create New Wallet") {
-		t.Error("Expected view to contain create wallet header")
+	
+	// Should not be empty
+	if view == "" {
+		t.Error("Expected non-empty view")
 	}
-
-	if !strings.Contains(view, "Wallet Name:") {
-		t.Error("Expected view to contain wallet name label")
-	}
-
-	if !strings.Contains(view, "Password:") {
-		t.Error("Expected view to contain password label")
-	}
-
-	if !strings.Contains(view, "Your wallet will be secured with a mnemonic phrase.") {
-		t.Error("Expected view to contain info message")
-	}
-
-	if !strings.Contains(view, "Tab: Next Field • Enter: Create • Esc: Back") {
-		t.Error("Expected view to contain footer instructions")
+	
+	// Should contain header text
+	if !strings.Contains(view, "Create New Wallet") {
+		t.Error("Expected view to contain header text")
 	}
 }
 
-func TestCreateWalletComponent_View_CreatingState(t *testing.T) {
+func TestCreateWalletComponent_ViewWithError(t *testing.T) {
 	component := NewCreateWalletComponent()
-	component.SetSize(80, 24)
-	component.SetCreating(true)
-
+	component.SetError(fmt.Errorf("test error"))
+	
 	view := component.View()
-
-	if !strings.Contains(view, "⏳ Creating wallet...") {
-		t.Error("Expected view to contain creating message")
-	}
-}
-
-func TestCreateWalletComponent_View_ErrorState(t *testing.T) {
-	component := NewCreateWalletComponent()
-	component.SetSize(80, 24)
-	component.err = fmt.Errorf("test error")
-
-	view := component.View()
-
-	if !strings.Contains(view, "❌ Error:") {
+	
+	// Should contain error message
+	if !strings.Contains(view, "test error") {
 		t.Error("Expected view to contain error message")
 	}
 }
 
-func TestCreateWalletComponent_View_FocusedFields(t *testing.T) {
+func TestCreateWalletComponent_ViewWithCreating(t *testing.T) {
 	component := NewCreateWalletComponent()
-	component.SetSize(80, 24)
-	component.nameInput.SetValue("test-wallet")
-	component.passwordInput.SetValue("test-password")
-
-	// Test name field focus
-	component.inputFocus = 0
+	component.SetCreating(true)
+	
 	view := component.View()
-	if !strings.Contains(view, "test-wallet") {
-		t.Error("Expected view to contain wallet name when name field is focused")
-	}
-
-	// Test password field focus
-	component.inputFocus = 1
-	view = component.View()
-	// Password field should show as masked, but we can still check basic structure
-	if !strings.Contains(view, "Password:") {
-		t.Error("Expected view to contain password label when password field is focused")
+	
+	// Should contain creating message
+	if !strings.Contains(view, "Creating wallet") {
+		t.Error("Expected view to contain creating message")
 	}
 }

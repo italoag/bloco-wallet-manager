@@ -1,0 +1,230 @@
+# .github/workflows/automated-release.yml
+name: Automated Release with Claude Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_commit:
+        description: 'Base commit for analysis'
+        required: true
+        type: string
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Custom version (optional, overrides bump_type)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (analysis only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  analyze-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for git operations
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install anthropic click gitpython python-dotenv
+      
+      - name: Configure Git
+        run: |
+          git config user.name "Release Bot"
+          git config user.email "release-bot@example.com"
+      
+      - name: Validate inputs
+        run: |
+          # Verificar se o commit base existe
+          if ! git rev-parse --verify "${{ github.event.inputs.base_commit }}" >/dev/null 2>&1; then
+            echo "❌ Base commit '${{ github.event.inputs.base_commit }}' não encontrado"
+            exit 1
+          fi
+          
+          # Verificar se há commits para analisar
+          commit_count=$(git rev-list --count "${{ github.event.inputs.base_commit }}..HEAD")
+          if [ "$commit_count" -eq 0 ]; then
+            echo "❌ Nenhum commit encontrado desde '${{ github.event.inputs.base_commit }}'"
+            exit 1
+          fi
+          
+          echo "✅ $commit_count commits encontrados para análise"
+      
+      - name: Run commit analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Preparar argumentos do script
+          args="--base-commit ${{ github.event.inputs.base_commit }}"
+          
+          if [ "${{ github.event.inputs.custom_version }}" != "" ]; then
+            args="$args --version ${{ github.event.inputs.custom_version }}"
+          fi
+          
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            args="$args --dry-run"
+          fi
+          
+          args="$args --output-changelog CHANGELOG.md"
+          
+          echo "🔍 Executando análise com: python commit_analyzer.py $args"
+          python commit_analyzer.py $args
+      
+      - name: Determine version (if not dry run)
+        if: github.event.inputs.dry_run != 'true'
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.custom_version }}" != "" ]; then
+            version="${{ github.event.inputs.custom_version }}"
+          else
+            # Obter último tag
+            last_tag=$(git tag -l "v*" | sort -V | tail -n 1)
+            if [ -z "$last_tag" ]; then
+              version="1.0.0"
+            else
+              # Incrementar versão baseado no bump_type
+              last_version="${last_tag#v}"
+              IFS='.' read -ra VERSION_PARTS <<< "$last_version"
+              major="${VERSION_PARTS[0]:-0}"
+              minor="${VERSION_PARTS[1]:-0}"
+              patch="${VERSION_PARTS[2]:-0}"
+              
+              case "${{ github.event.inputs.bump_type }}" in
+                major)
+                  version="$((major + 1)).0.0"
+                  ;;
+                minor)
+                  version="$major.$((minor + 1)).0"
+                  ;;
+                patch)
+                  version="$major.$minor.$((patch + 1))"
+                  ;;
+              esac
+            fi
+          fi
+          
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "✅ Nova versão: v$version"
+      
+      - name: Update version files (if not dry run)
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          # Atualizar package.json se existir
+          if [ -f "package.json" ]; then
+            if command -v jq > /dev/null; then
+              jq ".version = \"${{ steps.version.outputs.version }}\"" package.json > package.json.tmp
+              mv package.json.tmp package.json
+            else
+              sed -i "s/\"version\": \".*\"/\"version\": \"${{ steps.version.outputs.version }}\"/" package.json
+            fi
+            echo "✅ package.json atualizado"
+          fi
+      
+      - name: Commit and tag release (if not dry run)
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          # Commit mudanças
+          git add .
+          git commit -m "chore: bump version to v${{ steps.version.outputs.version }}
+
+          - Update version files
+          - Update CHANGELOG.md with release notes
+          
+          Generated by automated release workflow"
+          
+          # Criar tag
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          
+          echo "✅ Commit e tag criados"
+      
+      - name: Push changes (if not dry run)
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git push origin ${{ github.ref_name }}
+          git push origin "v${{ steps.version.outputs.version }}"
+          echo "✅ Changes pushed to repository"
+      
+      - name: Create GitHub Release (if not dry run)
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "v${{ steps.version.outputs.version }}"
+          release_name: "Release v${{ steps.version.outputs.version }}"
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            CHANGELOG.md
+            package.json
+          retention-days: 30
+      
+      - name: Job summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "**Mode**: Dry Run (Analysis Only)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode**: Full Release" >> $GITHUB_STEP_SUMMARY
+            echo "**Version**: v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Tag**: v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "**Base Commit**: ${{ github.event.inputs.base_commit }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Bump Type**: ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Changelog Preview" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          head -n 20 CHANGELOG.md >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  notify-teams:
+    needs: analyze-and-release
+    runs-on: ubuntu-latest
+    if: always() && github.event.inputs.dry_run != 'true'
+    
+    steps:
+      - name: Notify Teams (success)
+        if: needs.analyze-and-release.result == 'success'
+        run: |
+          # Aqui você pode adicionar notificação para Slack, Teams, etc.
+          echo "🎉 Release v${{ needs.analyze-and-release.outputs.version }} criado com sucesso!"
+      
+      - name: Notify Teams (failure)
+        if: needs.analyze-and-release.result == 'failure'
+        run: |
+          echo "❌ Falha na criação do release"

@@ -9,107 +9,125 @@ import (
 
 // renderSettings renders the main settings menu
 func (m Model) renderSettings() string {
-	var b strings.Builder
+	var contentParts []string
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
+	// Header
+	contentParts = append(contentParts, HeaderStyle.Render("⚙️  Settings"))
+	contentParts = append(contentParts, "")
 
-	itemStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
-
-	selectedStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		Background(lipgloss.Color("235"))
-
-	b.WriteString(headerStyle.Render("⚙️  Settings"))
-	b.WriteString("\n\n")
-
+	// Menu items
 	for i, item := range m.settingsItems {
-		style := itemStyle
-		if i == m.settingsSelected {
-			style = selectedStyle
-		}
-
 		prefix := "  "
 		if i == m.settingsSelected {
 			prefix = "▶ "
+			contentParts = append(contentParts, MenuSelectedStyle.Render(prefix+item))
+		} else {
+			contentParts = append(contentParts, ItemStyle.Render(prefix+item))
 		}
-
-		b.WriteString(style.Render(prefix + item))
-		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("↑/↓: Navigate • Enter: Select • Esc: Back"))
+	// Create main content
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
 
-	return b.String()
+	// Footer
+	footer := FooterStyle.Render("↑/↓: Navigate • Enter: Select • Esc: Back")
+
+	// Combine all parts with proper spacing
+	var finalParts []string
+	finalParts = append(finalParts, mainContent)
+
+	// Add spacing before footer
+	availableHeight := m.height - lipgloss.Height(mainContent) - 4
+	if availableHeight > 0 {
+		padding := strings.Repeat("\n", availableHeight)
+		finalParts = append(finalParts, padding)
+	}
+
+	finalParts = append(finalParts, footer)
+
+	return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
 }
 
 // renderNetworkConfig renders the network configuration view
 func (m Model) renderNetworkConfig() string {
-	var b strings.Builder
+	var contentParts []string
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
-
-	itemStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
-
-	selectedStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		Background(lipgloss.Color("235"))
-
-	b.WriteString(headerStyle.Render("🌐 Network Configuration"))
-	b.WriteString("\n\n")
+	// Header
+	contentParts = append(contentParts, HeaderStyle.Render("🌐 Network Configuration"))
+	contentParts = append(contentParts, "")
 
 	if m.editingRPC {
-		b.WriteString("Edit RPC Endpoint:\n\n")
-		b.WriteString(m.rpcInput.View())
-		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Enter: Save • Esc: Cancel"))
-	} else {
-		for i, item := range m.networkItems {
-			style := itemStyle
-			if i == m.networkSelected {
-				style = selectedStyle
-			}
+		contentParts = append(contentParts, LabelStyle.Render("Edit RPC Endpoint:"))
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, m.rpcInput.View())
 
+		// Create main content
+		mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
+
+		// Footer
+		footer := FooterStyle.Render("Enter: Save • Esc: Cancel")
+
+		// Combine all parts
+		var finalParts []string
+		finalParts = append(finalParts, mainContent)
+
+		// Add spacing before footer
+		availableHeight := m.height - lipgloss.Height(mainContent) - 4
+		if availableHeight > 0 {
+			padding := strings.Repeat("\n", availableHeight)
+			finalParts = append(finalParts, padding)
+		}
+
+		finalParts = append(finalParts, footer)
+
+		return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
+	} else {
+		// Network items
+		for i, item := range m.networkItems {
 			prefix := "  "
 			if i == m.networkSelected {
 				prefix = "▶ "
+				contentParts = append(contentParts, MenuSelectedStyle.Render(prefix+item))
+			} else {
+				contentParts = append(contentParts, ItemStyle.Render(prefix+item))
 			}
-
-			b.WriteString(style.Render(prefix + item))
-			b.WriteString("\n")
 		}
 
-		b.WriteString("\n")
+		// Create main content
+		mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
 
-		// Show different help text based on selected item
+		// Footer - different help text based on selected item
+		var footerText string
 		networkKeys := m.config.GetAllNetworkKeys()
 		if m.networkSelected < len(networkKeys) {
 			key := networkKeys[m.networkSelected]
 			if network, exists := m.config.GetNetworkByKey(key); exists {
-				helpText := "↑/↓: Navigate • Enter: Details • A: Toggle Active • E: Edit RPC"
+				footerText = "↑/↓: Navigate • Enter: Details • A: Toggle Active • E: Edit RPC"
 				if network.IsCustom {
-					helpText += " • D: Delete"
+					footerText += " • D: Delete"
 				}
-				helpText += " • Esc: Back"
-				b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(helpText))
+				footerText += " • Esc: Back"
 			}
 		} else {
-			// For "Add Custom Network" and "Back to Settings"
-			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("↑/↓: Navigate • Enter: Select • Esc: Back"))
+			footerText = "↑/↓: Navigate • Enter: Select • Esc: Back"
 		}
-	}
+		footer := FooterStyle.Render(footerText)
 
-	return b.String()
+		// Combine all parts with proper spacing
+		var finalParts []string
+		finalParts = append(finalParts, mainContent)
+
+		// Add spacing before footer
+		availableHeight := m.height - lipgloss.Height(mainContent) - 4
+		if availableHeight > 0 {
+			padding := strings.Repeat("\n", availableHeight)
+			finalParts = append(finalParts, padding)
+		}
+
+		finalParts = append(finalParts, footer)
+
+		return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
+	}
 }
 
 // renderLanguage renders the language selection view
@@ -155,122 +173,123 @@ func (m Model) renderLanguage() string {
 
 // renderAddNetwork renders the add custom network view
 func (m Model) renderAddNetwork() string {
-	var b strings.Builder
+	var contentParts []string
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		MarginBottom(2)
-
-	inputStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		MarginBottom(1)
-
-	focusedStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		Background(lipgloss.Color("235")).
-		MarginBottom(1)
-
-	b.WriteString(headerStyle.Render("🌐 Add Custom Network"))
-	b.WriteString("\n\n")
+	// Header
+	contentParts = append(contentParts, HeaderStyle.Render("🌐 Add Custom Network"))
+	contentParts = append(contentParts, "")
 
 	// Network Name input
 	nameLabel := "Network Name:"
-	nameStyle := inputStyle
 	if m.addNetworkFocus == 0 {
-		nameStyle = focusedStyle
+		nameLabel = LabelStyle.Render(nameLabel)
+	} else {
+		nameLabel = InfoStyle.Render(nameLabel)
 	}
-	b.WriteString(nameStyle.Render(nameLabel))
-	b.WriteString("\n")
-	b.WriteString(m.networkNameInput.View())
+	contentParts = append(contentParts, nameLabel)
+	contentParts = append(contentParts, m.networkNameInput.View())
 
 	// Show network suggestions if available
 	if m.showingSuggestions && len(m.networkSuggestions) > 0 && m.addNetworkFocus == 0 {
-		suggestionStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("244")).
-			Background(lipgloss.Color("236")).
-			Padding(0, 1).
-			MarginTop(1)
-
-		selectedSuggestionStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("15")). // White text
-			Background(lipgloss.Color("86")). // Green background
-			Padding(0, 1).
-			Bold(true)
-
-		b.WriteString("\n")
-		b.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
-			Bold(true).
-			Render("📡 Suggestions (Press Enter to select):"))
-		b.WriteString("\n")
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, LabelStyle.Render("📡 Suggestions (Press Enter to select):"))
 
 		for i, suggestion := range m.networkSuggestions {
-			style := suggestionStyle
+			var style lipgloss.Style
 			prefix := "  "
 			if i == m.selectedSuggestion {
-				style = selectedSuggestionStyle
-				prefix = "▶ " // Arrow indicator for selected item
+				style = SelectedSuggestionStyle
+				prefix = "▶ "
+			} else {
+				style = SuggestionStyle
 			}
 
 			suggestionText := fmt.Sprintf("%s%s (Chain ID: %d, Symbol: %s)",
 				prefix, suggestion.Name, suggestion.ChainID, suggestion.Symbol)
-			b.WriteString(style.Render(suggestionText))
-			b.WriteString("\n")
+			contentParts = append(contentParts, style.Render(suggestionText))
 		}
 
-		b.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Render("↑/↓: Navigate suggestions • Enter: Select • Esc: Close"))
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, FooterStyle.Render("↑/↓: Navigate suggestions • Enter: Select • Esc: Close"))
 	}
 
-	b.WriteString("\n\n")
+	contentParts = append(contentParts, "")
 
 	// Chain ID input
 	chainLabel := "Chain ID:"
-	chainStyle := inputStyle
 	if m.addNetworkFocus == 1 {
-		chainStyle = focusedStyle
+		chainLabel = LabelStyle.Render(chainLabel)
+	} else {
+		chainLabel = InfoStyle.Render(chainLabel)
 	}
-	b.WriteString(chainStyle.Render(chainLabel))
-	b.WriteString("\n")
-	b.WriteString(m.chainIDInput.View())
-	b.WriteString("\n\n")
+	contentParts = append(contentParts, chainLabel)
+	contentParts = append(contentParts, m.chainIDInput.View())
+	contentParts = append(contentParts, "")
 
 	// RPC Endpoint input
 	rpcLabel := "RPC Endpoint (optional - auto-filled from ChainList):"
-	rpcStyle := inputStyle
 	if m.addNetworkFocus == 2 {
-		rpcStyle = focusedStyle
-	}
-	b.WriteString(rpcStyle.Render(rpcLabel))
-	b.WriteString("\n")
-	b.WriteString(m.rpcEndpointInput.View())
-	b.WriteString("\n\n")
-
-	if m.addingNetwork {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Render("⏳ Adding network and finding best RPC endpoint..."))
-		b.WriteString("\n\n")
-	}
-
-	if m.err != nil {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("❌ Error: " + m.err.Error()))
-		b.WriteString("\n\n")
-	}
-
-	// Instructions
-	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-
-	if m.showingSuggestions && m.addNetworkFocus == 0 {
-		b.WriteString(instructionStyle.Render("↑/↓: Navigate suggestions • Enter: Select • Esc: Close suggestions"))
+		rpcLabel = LabelStyle.Render(rpcLabel)
 	} else {
-		b.WriteString(instructionStyle.Render("Tab: Next Field • Enter: Add Network • Esc: Cancel"))
-		b.WriteString("\n")
-		b.WriteString(instructionStyle.Render("💡 Tip: Type network name for suggestions or enter Chain ID for auto-completion"))
+		rpcLabel = InfoStyle.Render(rpcLabel)
+	}
+	contentParts = append(contentParts, rpcLabel)
+	contentParts = append(contentParts, m.rpcEndpointInput.View())
+
+	// Adding network status
+	if m.addingNetwork {
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, LoadingStyle.Render("⏳ Adding network and finding best RPC endpoint..."))
 	}
 
-	return b.String()
+	// Error display
+	if m.err != nil {
+		contentParts = append(contentParts, "")
+		contentParts = append(contentParts, ErrorStyle.Render("❌ Error: "+m.err.Error()))
+	}
+
+	// Create main content
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, contentParts...)
+
+	// Footer instructions
+	var footerText string
+	if m.showingSuggestions && m.addNetworkFocus == 0 {
+		footerText = "↑/↓: Navigate suggestions • Enter: Select • Esc: Close suggestions"
+	} else {
+		footerText = "Tab: Next Field • Enter: Add Network • Esc: Cancel\n💡 Tip: Type network name for suggestions or enter Chain ID for auto-completion"
+	}
+	footer := FooterStyle.Render(footerText)
+
+	// Loading status (appears at bottom)
+	var loadingStatus string
+	if m.isLoading {
+		loadingText := m.loadingText
+		if loadingText == "" {
+			loadingText = "Loading..."
+		}
+		loadingStatus = LoadingStyle.Render(fmt.Sprintf("%s %s", m.loadingSpinner.View(), loadingText))
+	}
+
+	// Combine all parts with proper spacing
+	var finalParts []string
+	finalParts = append(finalParts, mainContent)
+
+	// Add spacing before footer/loading
+	availableHeight := m.height - lipgloss.Height(mainContent) - 4
+	if availableHeight > 0 {
+		padding := strings.Repeat("\n", availableHeight)
+		finalParts = append(finalParts, padding)
+	}
+
+	// Add loading status if present
+	if loadingStatus != "" {
+		finalParts = append(finalParts, loadingStatus)
+	}
+
+	// Add footer
+	finalParts = append(finalParts, footer)
+
+	return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
 }
 
 // renderNetworkDetails renders detailed view of a selected network
