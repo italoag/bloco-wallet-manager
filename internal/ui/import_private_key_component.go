@@ -105,6 +105,7 @@ func (c *ImportPrivateKeyComponent) Reset() {
 
 // Init initializes the component
 func (c *ImportPrivateKeyComponent) Init() tea.Cmd {
+	// Initialize the form so the first input is focused
 	return c.form.Init()
 }
 

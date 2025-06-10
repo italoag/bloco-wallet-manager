@@ -169,6 +169,7 @@ func (c *ImportMnemonicComponent) Reset() {
 
 // Init initializes the component
 func (c *ImportMnemonicComponent) Init() tea.Cmd {
+	// Initialize the form so input fields are ready
 	return c.form.Init()
 }
 

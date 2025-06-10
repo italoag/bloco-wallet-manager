@@ -131,15 +131,8 @@ func (c *AddNetworkComponent) Reset() {
 
 // Init initializes the component
 func (c *AddNetworkComponent) Init() tea.Cmd {
-	// Depois de huh.Form.Init, o formulário deve estar pronto para receber foco
-	// O input inicial deve receber foco automaticamente
-	return tea.Batch(
-		c.form.Init(),
-		// Enviar uma mensagem de tecla de tab para focar no primeiro campo
-		func() tea.Msg {
-			return tea.KeyMsg{Type: tea.KeyTab}
-		},
-	)
+	// Initialize the form so the first field is focused
+	return c.form.Init()
 }
 
 // Update handles messages for the add network component

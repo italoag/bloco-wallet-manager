@@ -92,6 +92,7 @@ func (c *CreateWalletComponent) Reset() {
 
 // Init initializes the component
 func (c *CreateWalletComponent) Init() tea.Cmd {
+	// Initialize the form so the first field receives focus
 	return c.form.Init()
 }
 
