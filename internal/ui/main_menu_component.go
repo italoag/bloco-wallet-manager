@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -66,7 +67,7 @@ func (c *MainMenuComponent) Update(msg tea.Msg) (*MainMenuComponent, tea.Cmd) {
 
 		// Check clicks on menu items
 		for i := range c.items {
-			if zone.Get(c.id + "-item-" + string(rune(i))).InBounds(msg) {
+			if zone.Get(c.id + "-item-" + strconv.Itoa(i)).InBounds(msg) {
 				c.selected = i
 				return c, func() tea.Msg { return MenuItemSelectedMsg{Index: i, Item: c.items[i]} }
 			}
@@ -124,7 +125,7 @@ func (c *MainMenuComponent) View() string {
 		}
 
 		// Mark zone for mouse interaction
-		b.WriteString(zone.Mark(c.id+"-item-"+string(rune(i)), itemText))
+		b.WriteString(zone.Mark(c.id+"-item-"+strconv.Itoa(i), itemText))
 		if i < len(c.items)-1 {
 			b.WriteString("\n")
 		}
