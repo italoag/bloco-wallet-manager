@@ -169,7 +169,13 @@ func (c *ImportMnemonicComponent) Reset() {
 
 // Init initializes the component
 func (c *ImportMnemonicComponent) Init() tea.Cmd {
-	return c.form.Init()
+	// Focus the first field so the user can immediately type
+	return tea.Batch(
+		c.form.Init(),
+		func() tea.Msg {
+			return tea.KeyMsg{Type: tea.KeyTab}
+		},
+	)
 }
 
 // Update handles messages for the import mnemonic component
