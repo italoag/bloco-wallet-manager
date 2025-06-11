@@ -145,7 +145,7 @@ func (c *CreateWalletComponent) Update(msg tea.Msg) (*CreateWalletComponent, tea
 		cmds = append(cmds, cmd)
 	}
 	// Check if form is completed - exactly like the example
-	if c.form.State == huh.StateCompleted {
+	if c.form.State == huh.StateCompleted && !c.creating {
 		// Get values directly from form instead of variables
 		walletName := strings.TrimSpace(c.form.GetString("walletName"))
 		password := strings.TrimSpace(c.form.GetString("password"))
