@@ -105,10 +105,10 @@ func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
 		return fmt.Errorf("failed to create wallet: %w", err)
 	}
 
-	// s.logger.Info("Wallet saved to database successfully",
-	// 	logger.String("correlation_id", correlationID),
-	// 	logger.String("wallet_id", w.ID),
-	// 	logger.String("operation", "db_create_wallet"))
+	s.logger.Debug("Wallet saved to database successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", w.ID),
+		logger.String("operation", "db_create_wallet"))
 
 	return nil
 }

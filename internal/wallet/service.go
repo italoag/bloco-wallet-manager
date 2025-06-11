@@ -106,11 +106,11 @@ func (s *Service) Create(ctx context.Context, name, address, keystorePath string
 	correlationID := uuid.New().String()
 	ctx = context.WithValue(ctx, "correlation_id", correlationID)
 
-	// s.logger.Info("Creating new wallet",
-	// 	logger.String("correlation_id", correlationID),
-	// 	logger.String("wallet_name", name),
-	// 	logger.String("address", address),
-	// 	logger.String("operation", "create_wallet"))
+	s.logger.Debug("Creating new wallet",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_name", name),
+		logger.String("address", address),
+		logger.String("operation", "create_wallet"))
 
 	if name == "" {
 		err := NewValidationError("wallet name cannot be empty")
@@ -160,11 +160,11 @@ func (s *Service) Create(ctx context.Context, name, address, keystorePath string
 		return nil, AddCorrelationID(ctx, NewStorageError("failed to create wallet", err))
 	}
 
-	// s.logger.Info("Wallet created successfully",
-	// 	logger.String("correlation_id", correlationID),
-	// 	logger.String("wallet_id", wallet.ID),
-	// 	logger.String("address", wallet.Address),
-	// 	logger.String("operation", "create_wallet"))
+	s.logger.Debug("Wallet created successfully",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", wallet.ID),
+		logger.String("address", wallet.Address),
+		logger.String("operation", "create_wallet"))
 
 	return wallet, nil
 }
@@ -287,10 +287,10 @@ func (s *Service) CreateWalletWithMnemonic(ctx context.Context, name, password s
 	correlationID := uuid.New().String()
 	ctx = context.WithValue(ctx, "correlation_id", correlationID)
 
-	// s.logger.Info("Creating wallet with mnemonic",
-	// 	logger.String("correlation_id", correlationID),
-	// 	logger.String("wallet_name", name),
-	// 	logger.String("operation", "create_wallet_with_mnemonic"))
+	s.logger.Debug("Creating wallet with mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_name", name),
+		logger.String("operation", "create_wallet_with_mnemonic"))
 
 	if name == "" {
 		err := NewValidationError("wallet name cannot be empty")
@@ -434,12 +434,12 @@ func (s *Service) CreateWalletWithMnemonic(ctx context.Context, name, password s
 		return nil, AddCorrelationID(ctx, err)
 	}
 
-	// s.logger.Info("Wallet created successfully with mnemonic",
-	// 	logger.String("correlation_id", correlationID),
-	// 	logger.String("wallet_id", wallet.ID),
-	// 	logger.String("address", wallet.Address),
-	// 	logger.String("keystore_path", keystorePath),
-	// 	logger.String("operation", "create_wallet_with_mnemonic"))
+	s.logger.Debug("Wallet created successfully with mnemonic",
+		logger.String("correlation_id", correlationID),
+		logger.String("wallet_id", wallet.ID),
+		logger.String("address", wallet.Address),
+		logger.String("keystore_path", keystorePath),
+		logger.String("operation", "create_wallet_with_mnemonic"))
 
 	return &WalletDetails{
 		Wallet:     wallet,
