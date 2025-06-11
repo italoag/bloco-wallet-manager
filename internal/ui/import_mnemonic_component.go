@@ -139,11 +139,39 @@ func (c *ImportMnemonicComponent) SetImporting(importing bool) {
 
 // GetWalletName returns the entered wallet name
 func (c *ImportMnemonicComponent) GetWalletName() string {
-	return c.walletName
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("walletName"))
+	}
+	return strings.TrimSpace(c.walletName)
 }
 
 // GetMnemonic returns the entered mnemonic
 func (c *ImportMnemonicComponent) GetMnemonic() string {
+	if c.form != nil {
+		// Try to get values from form first
+		words := []string{
+			c.form.GetString("word1"), c.form.GetString("word2"), c.form.GetString("word3"),
+			c.form.GetString("word4"), c.form.GetString("word5"), c.form.GetString("word6"),
+			c.form.GetString("word7"), c.form.GetString("word8"), c.form.GetString("word9"),
+			c.form.GetString("word10"), c.form.GetString("word11"), c.form.GetString("word12"),
+		}
+		
+		// Check if any form values are present
+		hasFormValues := false
+		for _, word := range words {
+			if strings.TrimSpace(word) != "" {
+				hasFormValues = true
+				break
+			}
+		}
+		
+		// If form has values, use them; otherwise fall back to component variables
+		if hasFormValues {
+			return strings.Join(words, " ")
+		}
+	}
+	
+	// Fallback to component variables (for tests and when form is empty)
 	words := []string{
 		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
 		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
@@ -153,7 +181,10 @@ func (c *ImportMnemonicComponent) GetMnemonic() string {
 
 // GetPassword returns the entered password
 func (c *ImportMnemonicComponent) GetPassword() string {
-	return c.password
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("password"))
+	}
+	return strings.TrimSpace(c.password)
 }
 
 // Reset clears all inputs
@@ -203,14 +234,27 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 	}
 
 	// Check if form is completed
-	if c.form.State == huh.StateCompleted {
-		if c.validateInputs() {
+	if c.form.State == huh.StateCompleted && !c.importing {
+		// Get values directly from form instead of variables
+		walletName := strings.TrimSpace(c.form.GetString("walletName"))
+		password := strings.TrimSpace(c.form.GetString("password"))
+		
+		// Get mnemonic words from form
+		words := []string{
+			c.form.GetString("word1"), c.form.GetString("word2"), c.form.GetString("word3"),
+			c.form.GetString("word4"), c.form.GetString("word5"), c.form.GetString("word6"),
+			c.form.GetString("word7"), c.form.GetString("word8"), c.form.GetString("word9"),
+			c.form.GetString("word10"), c.form.GetString("word11"), c.form.GetString("word12"),
+		}
+		mnemonic := strings.Join(words, " ")
+
+		if c.validateInputsFromForm(walletName, mnemonic, password) {
 			c.importing = true
 			return c, func() tea.Msg {
 				return ImportMnemonicRequestMsg{
-					Name:     c.GetWalletName(),
-					Mnemonic: c.GetMnemonic(),
-					Password: c.GetPassword(),
+					Name:     walletName,
+					Mnemonic: mnemonic,
+					Password: password,
 				}
 			}
 		}
@@ -221,22 +265,34 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 	return c, tea.Batch(cmds...)
 }
 
-// validateInputs checks if the inputs are valid
+// validateInputs checks if the inputs are valid (legacy method using component variables)
 func (c *ImportMnemonicComponent) validateInputs() bool {
-	if strings.TrimSpace(c.walletName) == "" {
+	words := []string{
+		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
+		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
+	}
+	mnemonic := strings.Join(words, " ")
+	return c.validateInputsFromForm(c.walletName, mnemonic, c.password)
+}
+
+// validateInputsFromForm checks if the provided inputs are valid
+func (c *ImportMnemonicComponent) validateInputsFromForm(walletName, mnemonic, password string) bool {
+	if strings.TrimSpace(walletName) == "" {
 		c.err = fmt.Errorf("Wallet name cannot be empty")
 		return false
 	}
-	if strings.TrimSpace(c.password) == "" {
+	if strings.TrimSpace(password) == "" {
 		c.err = fmt.Errorf("Password cannot be empty")
 		return false
 	}
 
 	// Check if all 12 words are filled
-	words := []string{
-		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
-		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
+	words := strings.Fields(strings.TrimSpace(mnemonic))
+	if len(words) != 12 {
+		c.err = fmt.Errorf("Mnemonic must contain exactly 12 words, got %d", len(words))
+		return false
 	}
+
 	for i, word := range words {
 		if strings.TrimSpace(word) == "" {
 			c.err = fmt.Errorf("All 12 words must be filled (word %d is empty)", i+1)

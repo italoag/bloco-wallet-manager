@@ -80,17 +80,26 @@ func (c *ImportPrivateKeyComponent) SetImporting(importing bool) {
 
 // GetWalletName returns the entered wallet name
 func (c *ImportPrivateKeyComponent) GetWalletName() string {
-	return c.walletName
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("walletName"))
+	}
+	return strings.TrimSpace(c.walletName)
 }
 
 // GetPrivateKey returns the entered private key
 func (c *ImportPrivateKeyComponent) GetPrivateKey() string {
-	return c.privateKey
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("privateKey"))
+	}
+	return strings.TrimSpace(c.privateKey)
 }
 
 // GetPassword returns the entered password
 func (c *ImportPrivateKeyComponent) GetPassword() string {
-	return c.password
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("password"))
+	}
+	return strings.TrimSpace(c.password)
 }
 
 // Reset clears all inputs
@@ -139,14 +148,19 @@ func (c *ImportPrivateKeyComponent) Update(msg tea.Msg) (*ImportPrivateKeyCompon
 	}
 
 	// Check if form is completed
-	if c.form.State == huh.StateCompleted {
-		if c.validateInputs() {
+	if c.form.State == huh.StateCompleted && !c.importing {
+		// Get values directly from form instead of variables
+		walletName := strings.TrimSpace(c.form.GetString("walletName"))
+		privateKey := strings.TrimSpace(c.form.GetString("privateKey"))
+		password := strings.TrimSpace(c.form.GetString("password"))
+
+		if c.validateInputsFromForm(walletName, privateKey, password) {
 			c.importing = true
 			return c, func() tea.Msg {
 				return ImportPrivateKeyRequestMsg{
-					Name:       c.GetWalletName(),
-					PrivateKey: c.GetPrivateKey(),
-					Password:   c.GetPassword(),
+					Name:       walletName,
+					PrivateKey: privateKey,
+					Password:   password,
 				}
 			}
 		}
@@ -157,33 +171,38 @@ func (c *ImportPrivateKeyComponent) Update(msg tea.Msg) (*ImportPrivateKeyCompon
 	return c, tea.Batch(cmds...)
 }
 
-// validateInputs checks if the inputs are valid
+// validateInputs checks if the inputs are valid (legacy method using component variables)
 func (c *ImportPrivateKeyComponent) validateInputs() bool {
-	if strings.TrimSpace(c.walletName) == "" {
+	return c.validateInputsFromForm(c.walletName, c.privateKey, c.password)
+}
+
+// validateInputsFromForm checks if the provided inputs are valid
+func (c *ImportPrivateKeyComponent) validateInputsFromForm(walletName, privateKey, password string) bool {
+	if strings.TrimSpace(walletName) == "" {
 		c.err = fmt.Errorf("Wallet name cannot be empty")
 		return false
 	}
-	if strings.TrimSpace(c.privateKey) == "" {
+	if strings.TrimSpace(privateKey) == "" {
 		c.err = fmt.Errorf("Private key cannot be empty")
 		return false
 	}
-	if strings.TrimSpace(c.password) == "" {
+	if strings.TrimSpace(password) == "" {
 		c.err = fmt.Errorf("Password cannot be empty")
 		return false
 	}
 
 	// Basic private key validation
-	privateKey := strings.TrimSpace(c.privateKey)
-	privateKey = strings.TrimPrefix(privateKey, "0x")
-	privateKey = strings.TrimPrefix(privateKey, "0X")
+	cleanPrivateKey := strings.TrimSpace(privateKey)
+	cleanPrivateKey = strings.TrimPrefix(cleanPrivateKey, "0x")
+	cleanPrivateKey = strings.TrimPrefix(cleanPrivateKey, "0X")
 
-	if len(privateKey) != 64 {
+	if len(cleanPrivateKey) != 64 {
 		c.err = fmt.Errorf("Private key must be 64 characters long (32 bytes)")
 		return false
 	}
 
 	// Check if it's a valid hex string
-	for _, char := range privateKey {
+	for _, char := range cleanPrivateKey {
 		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
 			c.err = fmt.Errorf("Private key must contain only hexadecimal characters")
 			return false
