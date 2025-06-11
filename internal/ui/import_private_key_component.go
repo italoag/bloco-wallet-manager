@@ -81,7 +81,10 @@ func (c *ImportPrivateKeyComponent) SetImporting(importing bool) {
 // GetWalletName returns the entered wallet name
 func (c *ImportPrivateKeyComponent) GetWalletName() string {
 	if c.form != nil {
-		return strings.TrimSpace(c.form.GetString("walletName"))
+		formValue := strings.TrimSpace(c.form.GetString("walletName"))
+		if formValue != "" {
+			return formValue
+		}
 	}
 	return strings.TrimSpace(c.walletName)
 }
@@ -89,7 +92,10 @@ func (c *ImportPrivateKeyComponent) GetWalletName() string {
 // GetPrivateKey returns the entered private key
 func (c *ImportPrivateKeyComponent) GetPrivateKey() string {
 	if c.form != nil {
-		return strings.TrimSpace(c.form.GetString("privateKey"))
+		formValue := strings.TrimSpace(c.form.GetString("privateKey"))
+		if formValue != "" {
+			return formValue
+		}
 	}
 	return strings.TrimSpace(c.privateKey)
 }
@@ -97,7 +103,10 @@ func (c *ImportPrivateKeyComponent) GetPrivateKey() string {
 // GetPassword returns the entered password
 func (c *ImportPrivateKeyComponent) GetPassword() string {
 	if c.form != nil {
-		return strings.TrimSpace(c.form.GetString("password"))
+		formValue := strings.TrimSpace(c.form.GetString("password"))
+		if formValue != "" {
+			return formValue
+		}
 	}
 	return strings.TrimSpace(c.password)
 }
@@ -149,10 +158,25 @@ func (c *ImportPrivateKeyComponent) Update(msg tea.Msg) (*ImportPrivateKeyCompon
 
 	// Check if form is completed
 	if c.form.State == huh.StateCompleted && !c.importing {
-		// Get values directly from form instead of variables
-		walletName := strings.TrimSpace(c.form.GetString("walletName"))
-		privateKey := strings.TrimSpace(c.form.GetString("privateKey"))
-		password := strings.TrimSpace(c.form.GetString("password"))
+		// Get values from form (try form first, fallback to variables)
+		formWalletName := strings.TrimSpace(c.form.GetString("walletName"))
+		formPrivateKey := strings.TrimSpace(c.form.GetString("privateKey"))
+		formPassword := strings.TrimSpace(c.form.GetString("password"))
+
+		walletName := formWalletName
+		privateKey := formPrivateKey
+		password := formPassword
+
+		// Fallback to component variables if form values are empty
+		if walletName == "" {
+			walletName = strings.TrimSpace(c.walletName)
+		}
+		if privateKey == "" {
+			privateKey = strings.TrimSpace(c.privateKey)
+		}
+		if password == "" {
+			password = strings.TrimSpace(c.password)
+		}
 
 		if c.validateInputsFromForm(walletName, privateKey, password) {
 			c.importing = true

@@ -9,6 +9,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// WizardStep represents the current step of the wizard
+type WizardStep int
+
+const (
+	StepBasicInfo WizardStep = iota + 1
+	StepMnemonicWords
+)
+
 // ImportMnemonicComponent represents the mnemonic import component
 type ImportMnemonicComponent struct {
 	id        string
@@ -18,38 +26,68 @@ type ImportMnemonicComponent struct {
 	err       error
 	importing bool
 
+	// Wizard state
+	currentStep WizardStep
+
 	// Form values
 	walletName                                  string
+	password                                    string
 	word1, word2, word3, word4, word5, word6    string
 	word7, word8, word9, word10, word11, word12 string
-	password                                    string
 }
 
 // NewImportMnemonicComponent creates a new mnemonic import component
 func NewImportMnemonicComponent() ImportMnemonicComponent {
 	c := ImportMnemonicComponent{
-		id: "import-mnemonic",
+		id:          "import-mnemonic",
+		currentStep: StepBasicInfo,
 	}
-	c.initForm()
+	c.initBasicInfoForm()
 	return c
 }
 
-// initForm initializes the huh form with proper layout for mnemonic words
-func (c *ImportMnemonicComponent) initForm() {
+// initBasicInfoForm initializes the first step form (wallet name and password)
+func (c *ImportMnemonicComponent) initBasicInfoForm() {
+	// Reset values
+	c.walletName = ""
+	c.password = ""
+
 	c.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Key("walletName").
 				Title("Wallet Name").
 				Placeholder("Enter wallet name...").
-				Value(&c.walletName),
+				Value(&c.walletName).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("wallet name cannot be empty")
+					}
+					return nil
+				}),
 			huh.NewInput().
 				Key("password").
 				Title("Password").
 				Placeholder("Enter password...").
 				EchoMode(huh.EchoModePassword).
-				Value(&c.password),
+				Value(&c.password).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("password cannot be empty")
+					}
+					return nil
+				}),
 		),
+	).WithWidth(60).WithShowHelp(false).WithShowErrors(false)
+}
+
+// initMnemonicForm initializes the second step form (12 mnemonic words)
+func (c *ImportMnemonicComponent) initMnemonicForm() {
+	// Reset mnemonic words
+	c.word1, c.word2, c.word3, c.word4, c.word5, c.word6 = "", "", "", "", "", ""
+	c.word7, c.word8, c.word9, c.word10, c.word11, c.word12 = "", "", "", "", "", ""
+
+	c.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Key("word1").
@@ -155,7 +193,7 @@ func (c *ImportMnemonicComponent) GetMnemonic() string {
 			c.form.GetString("word7"), c.form.GetString("word8"), c.form.GetString("word9"),
 			c.form.GetString("word10"), c.form.GetString("word11"), c.form.GetString("word12"),
 		}
-		
+
 		// Check if any form values are present
 		hasFormValues := false
 		for _, word := range words {
@@ -164,13 +202,13 @@ func (c *ImportMnemonicComponent) GetMnemonic() string {
 				break
 			}
 		}
-		
+
 		// If form has values, use them; otherwise fall back to component variables
 		if hasFormValues {
 			return strings.Join(words, " ")
 		}
 	}
-	
+
 	// Fallback to component variables (for tests and when form is empty)
 	words := []string{
 		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
@@ -187,7 +225,7 @@ func (c *ImportMnemonicComponent) GetPassword() string {
 	return strings.TrimSpace(c.password)
 }
 
-// Reset clears all inputs
+// Reset clears all inputs and resets to first step
 func (c *ImportMnemonicComponent) Reset() {
 	c.walletName = ""
 	c.word1, c.word2, c.word3, c.word4, c.word5, c.word6 = "", "", "", "", "", ""
@@ -195,7 +233,8 @@ func (c *ImportMnemonicComponent) Reset() {
 	c.password = ""
 	c.err = nil
 	c.importing = false
-	c.initForm()
+	c.currentStep = StepBasicInfo
+	c.initBasicInfoForm()
 }
 
 // Init initializes the component
@@ -213,6 +252,20 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 		c.width = msg.Width
 		c.height = msg.Height
 
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			if c.currentStep == StepMnemonicWords {
+				// Go back to previous step
+				c.currentStep = StepBasicInfo
+				c.initBasicInfoForm()
+				return c, c.form.Init()
+			} else {
+				// Exit to menu
+				return c, func() tea.Msg { return BackToMenuMsg{} }
+			}
+		}
+
 	case walletCreatedMsg:
 		c.Reset()
 		return c, func() tea.Msg { return BackToMenuMsg{} }
@@ -221,100 +274,129 @@ func (c *ImportMnemonicComponent) Update(msg tea.Msg) (*ImportMnemonicComponent,
 		c.SetError(fmt.Errorf("%s", string(msg)))
 	}
 
-	// Update the form first (allows typing and internal navigation)
+	// Process the form
 	form, cmd := c.form.Update(msg)
 	if f, ok := form.(*huh.Form); ok {
 		c.form = f
 		cmds = append(cmds, cmd)
 	}
 
-	// Only handle escape if form didn't handle it (when form is not focused on input)
-	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "esc" && c.form.State == huh.StateNormal {
-		return c, func() tea.Msg { return BackToMenuMsg{} }
-	}
-
-	// Check if form is completed
+	// Check if current step is completed
 	if c.form.State == huh.StateCompleted && !c.importing {
-		// Get values directly from form instead of variables
-		walletName := strings.TrimSpace(c.form.GetString("walletName"))
-		password := strings.TrimSpace(c.form.GetString("password"))
-		
-		// Get mnemonic words from form
-		words := []string{
-			c.form.GetString("word1"), c.form.GetString("word2"), c.form.GetString("word3"),
-			c.form.GetString("word4"), c.form.GetString("word5"), c.form.GetString("word6"),
-			c.form.GetString("word7"), c.form.GetString("word8"), c.form.GetString("word9"),
-			c.form.GetString("word10"), c.form.GetString("word11"), c.form.GetString("word12"),
-		}
-		mnemonic := strings.Join(words, " ")
+		switch c.currentStep {
+		case StepBasicInfo:
+			// Store values from basic info step (try form first, fallback to variables)
+			formWalletName := strings.TrimSpace(c.form.GetString("walletName"))
+			formPassword := strings.TrimSpace(c.form.GetString("password"))
 
-		if c.validateInputsFromForm(walletName, mnemonic, password) {
+			if formWalletName != "" {
+				c.walletName = formWalletName
+			}
+			if formPassword != "" {
+				c.password = formPassword
+			}
+
+			// Validate basic info
+			if strings.TrimSpace(c.walletName) == "" || strings.TrimSpace(c.password) == "" {
+				c.SetError(fmt.Errorf("wallet name and password are required"))
+				return c, nil
+			}
+
+			// First step completed, move to mnemonic step
+			c.currentStep = StepMnemonicWords
+			c.initMnemonicForm()
+			return c, c.form.Init()
+
+		case StepMnemonicWords:
+			// All steps completed, proceed with import
+			// Get mnemonic words from form (try form first, fallback to variables)
+			formWords := []string{
+				strings.TrimSpace(c.form.GetString("word1")), strings.TrimSpace(c.form.GetString("word2")), strings.TrimSpace(c.form.GetString("word3")),
+				strings.TrimSpace(c.form.GetString("word4")), strings.TrimSpace(c.form.GetString("word5")), strings.TrimSpace(c.form.GetString("word6")),
+				strings.TrimSpace(c.form.GetString("word7")), strings.TrimSpace(c.form.GetString("word8")), strings.TrimSpace(c.form.GetString("word9")),
+				strings.TrimSpace(c.form.GetString("word10")), strings.TrimSpace(c.form.GetString("word11")), strings.TrimSpace(c.form.GetString("word12")),
+			}
+
+			// Check if form has values, otherwise use component variables
+			hasFormWords := false
+			for _, word := range formWords {
+				if word != "" {
+					hasFormWords = true
+					break
+				}
+			}
+
+			var words []string
+			if hasFormWords {
+				words = formWords
+			} else {
+				// Fallback to component variables (for tests)
+				words = []string{
+					strings.TrimSpace(c.word1), strings.TrimSpace(c.word2), strings.TrimSpace(c.word3),
+					strings.TrimSpace(c.word4), strings.TrimSpace(c.word5), strings.TrimSpace(c.word6),
+					strings.TrimSpace(c.word7), strings.TrimSpace(c.word8), strings.TrimSpace(c.word9),
+					strings.TrimSpace(c.word10), strings.TrimSpace(c.word11), strings.TrimSpace(c.word12),
+				}
+			}
+
+			// Filter out empty words and join
+			var validWords []string
+			for _, word := range words {
+				if word != "" {
+					validWords = append(validWords, word)
+				}
+			}
+
+			if len(validWords) != 12 {
+				c.SetError(fmt.Errorf("mnemonic must contain exactly 12 words"))
+				return c, nil
+			}
+
+			mnemonic := strings.Join(validWords, " ")
+
 			c.importing = true
 			return c, func() tea.Msg {
 				return ImportMnemonicRequestMsg{
-					Name:     walletName,
+					Name:     c.walletName,
 					Mnemonic: mnemonic,
-					Password: password,
+					Password: c.password,
 				}
 			}
 		}
-		// Reset form state if validation failed
-		c.form.State = huh.StateNormal
 	}
 
 	return c, tea.Batch(cmds...)
-}
-
-// validateInputs checks if the inputs are valid (legacy method using component variables)
-func (c *ImportMnemonicComponent) validateInputs() bool {
-	words := []string{
-		c.word1, c.word2, c.word3, c.word4, c.word5, c.word6,
-		c.word7, c.word8, c.word9, c.word10, c.word11, c.word12,
-	}
-	mnemonic := strings.Join(words, " ")
-	return c.validateInputsFromForm(c.walletName, mnemonic, c.password)
-}
-
-// validateInputsFromForm checks if the provided inputs are valid
-func (c *ImportMnemonicComponent) validateInputsFromForm(walletName, mnemonic, password string) bool {
-	if strings.TrimSpace(walletName) == "" {
-		c.err = fmt.Errorf("Wallet name cannot be empty")
-		return false
-	}
-	if strings.TrimSpace(password) == "" {
-		c.err = fmt.Errorf("Password cannot be empty")
-		return false
-	}
-
-	// Check if all 12 words are filled
-	words := strings.Fields(strings.TrimSpace(mnemonic))
-	if len(words) != 12 {
-		c.err = fmt.Errorf("Mnemonic must contain exactly 12 words, got %d", len(words))
-		return false
-	}
-
-	for i, word := range words {
-		if strings.TrimSpace(word) == "" {
-			c.err = fmt.Errorf("All 12 words must be filled (word %d is empty)", i+1)
-			return false
-		}
-	}
-
-	c.err = nil
-	return true
 }
 
 // View renders the import mnemonic component
 func (c *ImportMnemonicComponent) View() string {
 	var b strings.Builder
 
-	// Header
+	// Header with step indicator
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("86")).
 		MarginBottom(1)
-	b.WriteString(headerStyle.Render("📥 Import Wallet from Mnemonic"))
+
+	stepIndicator := ""
+	switch c.currentStep {
+	case StepBasicInfo:
+		stepIndicator = " (Step 1/2: Basic Information)"
+	case StepMnemonicWords:
+		stepIndicator = " (Step 2/2: Mnemonic Phrase)"
+	}
+
+	b.WriteString(headerStyle.Render("📥 Import Wallet from Mnemonic" + stepIndicator))
 	b.WriteString("\n\n")
+
+	// Show wallet name and password from previous step if on step 2
+	if c.currentStep == StepMnemonicWords && c.walletName != "" {
+		infoStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			MarginBottom(1)
+		b.WriteString(infoStyle.Render(fmt.Sprintf("Wallet Name: %s", c.walletName)))
+		b.WriteString("\n")
+	}
 
 	// Form
 	b.WriteString(c.form.View())
@@ -328,15 +410,32 @@ func (c *ImportMnemonicComponent) View() string {
 		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 	}
 
-	// Instructions
-	b.WriteString("\n\n")
-	b.WriteString(WarningStyle.Render("⚠️  Important: Make sure your mnemonic phrase is correct!"))
+	// Step-specific instructions
 	b.WriteString("\n")
-	b.WriteString(InfoStyle.Render("   Enter each word in the correct order from 1-12."))
+	switch c.currentStep {
+	case StepBasicInfo:
+		b.WriteString(InfoStyle.Render("💡 First, enter your wallet name and password."))
+		b.WriteString("\n")
+		b.WriteString(InfoStyle.Render("   These will be used to secure your imported wallet."))
+	case StepMnemonicWords:
+		b.WriteString(WarningStyle.Render("⚠️  Important: Enter your 12-word mnemonic phrase!"))
+		b.WriteString("\n")
+		b.WriteString(InfoStyle.Render("   Each word should be entered in the correct order (1-12)."))
+		b.WriteString("\n")
+		b.WriteString(InfoStyle.Render("   The words are arranged in two columns for easier input."))
+	}
+
 	b.WriteString("\n\n")
 
-	// Footer
-	b.WriteString(FooterStyle.Render("Tab/Arrow Keys: Navigate • Enter: Import • Esc: Back"))
+	// Footer with navigation instructions
+	var footerText string
+	switch c.currentStep {
+	case StepBasicInfo:
+		footerText = "Tab/Arrow Keys: Navigate • Enter: Next Step • Esc: Back to Menu"
+	case StepMnemonicWords:
+		footerText = "Tab/Arrow Keys: Navigate • Enter: Import Wallet • Esc: Previous Step"
+	}
+	b.WriteString(FooterStyle.Render(footerText))
 
 	return b.String()
 }
