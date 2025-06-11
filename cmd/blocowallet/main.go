@@ -23,8 +23,8 @@ func main() {
 	}
 	defer appLogger.Sync()
 
-	// appLogger.Info("Starting BlockoWallet application",
-	// 	logger.String("operation", "application_startup"))
+	appLogger.Debug("Starting BlockoWallet application",
+		logger.String("operation", "application_startup"))
 
 	// Setup application directory
 	homeDir, err := os.UserHomeDir()
@@ -57,8 +57,8 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// appLogger.Info("Configuration loaded successfully",
-	// 	logger.String("operation", "application_startup"))
+	appLogger.Debug("Configuration loaded successfully",
+		logger.String("operation", "application_startup"))
 
 	// Initialize storage
 	dbPath := cfg.Database.Path
@@ -92,21 +92,21 @@ func main() {
 	// Setup providers for all networks
 	multiProvider.RefreshProviders(cfg)
 
-	// appLogger.Info("Blockchain providers initialized",
-	// 	logger.String("operation", "application_startup"))
+	appLogger.Debug("Blockchain providers initialized",
+		logger.String("operation", "application_startup"))
 
 	// Initialize wallet service with multi-provider
 	walletService := wallet.NewServiceWithMultiProvider(repo, multiProvider, appLogger)
 
-	// appLogger.Info("Wallet service initialized",
-	// 	logger.String("operation", "application_startup"))
+	appLogger.Debug("Wallet service initialized",
+		logger.String("operation", "application_startup"))
 
 	// Initialize and run TUI
 	model := ui.NewModel(walletService, cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
-	// appLogger.Info("Starting TUI interface",
-	// 	logger.String("operation", "application_startup"))
+	appLogger.Debug("Starting TUI interface",
+		logger.String("operation", "application_startup"))
 
 	if _, err := p.Run(); err != nil {
 		appLogger.Error("TUI execution failed",
@@ -115,6 +115,6 @@ func main() {
 		log.Fatalf("Failed to run TUI: %v", err)
 	}
 
-	// appLogger.Info("Application shutdown completed",
-	// 	logger.String("operation", "application_shutdown"))
+	appLogger.Debug("Application shutdown completed",
+		logger.String("operation", "application_shutdown"))
 }

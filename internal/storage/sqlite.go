@@ -35,9 +35,9 @@ func NewSQLite(databasePath string, log logger.Logger) (*SQLite, error) {
 		logger: log,
 	}
 
-	// log.Info("Initializing SQLite database",
-	// 	logger.String("database_path", databasePath),
-	// 	logger.String("operation", "initialize_database"))
+	log.Debug("Initializing SQLite database",
+		logger.String("database_path", databasePath),
+		logger.String("operation", "initialize_database"))
 
 	if err := sqlite.createTables(); err != nil {
 		log.Error("Failed to create database tables",
@@ -47,9 +47,9 @@ func NewSQLite(databasePath string, log logger.Logger) (*SQLite, error) {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	// log.Info("SQLite database initialized successfully",
-	// 	logger.String("database_path", databasePath),
-	// 	logger.String("operation", "initialize_database"))
+	log.Debug("SQLite database initialized successfully",
+		logger.String("database_path", databasePath),
+		logger.String("operation", "initialize_database"))
 
 	return sqlite, nil
 }
