@@ -299,10 +299,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.MouseMsg:
-		// Update bubblezone with mouse events
-		return zone.AnyInBoundsAndUpdate(m, msg)
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height

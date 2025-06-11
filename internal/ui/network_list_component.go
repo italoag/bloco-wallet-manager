@@ -3,7 +3,6 @@ package ui
 import (
 	"blocowallet/pkg/config"
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -23,15 +22,16 @@ type NetworkListComponent struct {
 
 // networkItem represents a network item
 type networkItem struct {
+	id          string
 	title       string
 	description string
 	key         string
 	network     config.Network
 }
 
-func (i networkItem) Title() string       { return i.title }
+func (i networkItem) Title() string       { return zone.Mark(i.id, i.title) }
 func (i networkItem) Description() string { return i.description }
-func (i networkItem) FilterValue() string { return i.title }
+func (i networkItem) FilterValue() string { return zone.Mark(i.id, i.title) }
 
 // networkKeyMap defines key bindings for the network menu
 type networkKeyMap struct {
@@ -78,7 +78,8 @@ func newNetworkKeyMap() *networkKeyMap {
 // NewNetworkListComponent creates a new network list component
 func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 	keys := newNetworkKeyMap()
-	delegate := newNetworkDelegate(keys)
+	// Use default delegate instead of custom delegate to avoid conflicts
+	delegate := list.NewDefaultDelegate()
 
 	networkList := list.New([]list.Item{}, delegate, 0, 0)
 	networkList.Title = "🌐 Network Configuration"
@@ -95,55 +96,6 @@ func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 
 	c.RefreshNetworks()
 	return c
-}
-
-// newNetworkDelegate creates a delegate for the network list
-func newNetworkDelegate(keys *networkKeyMap) list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
-
-	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		var item networkItem
-		var ok bool
-
-		if i := m.SelectedItem(); i != nil {
-			item, ok = i.(networkItem)
-			if !ok {
-				return nil
-			}
-		}
-
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch {
-			case key.Matches(msg, keys.choose):
-				return func() tea.Msg {
-					return NetworkSelectedMsg{Key: item.key, Network: item.network}
-				}
-			case key.Matches(msg, keys.toggle):
-				return func() tea.Msg {
-					return NetworkToggleMsg{Key: item.key}
-				}
-			case key.Matches(msg, keys.edit):
-				return func() tea.Msg {
-					return NetworkEditMsg{Key: item.key, Network: item.network}
-				}
-			case key.Matches(msg, keys.deleteNet):
-				if item.network.IsCustom {
-					return func() tea.Msg {
-						return NetworkDeleteMsg{Key: item.key}
-					}
-				}
-			case key.Matches(msg, keys.addNetwork):
-				return func() tea.Msg {
-					return NetworkAddRequestMsg{}
-				}
-			}
-		}
-
-		return nil
-	}
-
-	return d
 }
 
 // RefreshNetworks updates the network list with current networks
@@ -166,6 +118,7 @@ func (c *NetworkListComponent) RefreshNetworks() {
 			description := fmt.Sprintf("Chain ID: %d • %s", network.ChainID, network.RPCEndpoint)
 
 			items = append(items, networkItem{
+				id:          "network_" + key,
 				title:       title,
 				description: description,
 				key:         key,
@@ -176,12 +129,14 @@ func (c *NetworkListComponent) RefreshNetworks() {
 
 	// Add special items
 	items = append(items, networkItem{
+		id:          "network_add",
 		title:       "➕ Add Custom Network",
 		description: "Add a new custom network configuration",
 		key:         "add-network",
 	})
 
 	items = append(items, networkItem{
+		id:          "network_back",
 		title:       "🔙 Back to Settings",
 		description: "Return to the settings menu",
 		key:         "back-to-settings",
@@ -207,8 +162,6 @@ func (c *NetworkListComponent) GetSelected() string {
 
 // Update handles messages for the network list component
 func (c *NetworkListComponent) Update(msg tea.Msg) (*NetworkListComponent, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		c.width = msg.Width
@@ -216,59 +169,52 @@ func (c *NetworkListComponent) Update(msg tea.Msg) (*NetworkListComponent, tea.C
 		c.list.SetSize(msg.Width, msg.Height)
 
 	case tea.MouseMsg:
-		// Check if any network item was clicked
-		for i := 0; i < len(c.list.Items()); i++ {
-			itemZoneID := fmt.Sprintf("network-item-%d", i)
-			if zone.Get(itemZoneID).InBounds(msg) {
-				// Select and activate the clicked item
-				c.list.Select(i)
-				if item, ok := c.list.SelectedItem().(networkItem); ok {
-					return c, func() tea.Msg { return NetworkSelectedMsg{Key: item.key, Network: item.network} }
+		if msg.Button == tea.MouseButtonWheelUp {
+			c.list.CursorUp()
+			return c, nil
+		}
+
+		if msg.Button == tea.MouseButtonWheelDown {
+			c.list.CursorDown()
+			return c, nil
+		}
+
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			for i, listItem := range c.list.VisibleItems() {
+				v, _ := listItem.(networkItem)
+				// Check each item to see if it's in bounds.
+				if zone.Get(v.id).InBounds(msg) {
+					// If so, select it in the list.
+					c.list.Select(i)
+					// Trigger selection action
+					return c, func() tea.Msg { return NetworkSelectedMsg{Key: v.key, Network: v.network} }
 				}
 			}
 		}
 
+		return c, nil
+
 	case tea.KeyMsg:
 		// Handle number shortcuts for quick navigation
 		switch msg.String() {
+		case "enter":
+			if item, ok := c.list.SelectedItem().(networkItem); ok {
+				return c, func() tea.Msg { return NetworkSelectedMsg{Key: item.key, Network: item.network} }
+			}
 		case "esc", "q":
 			return c, func() tea.Msg { return BackToSettingsMsg{} }
 		}
 	}
 
-	// Update the list
+	var cmd tea.Cmd
 	c.list, cmd = c.list.Update(msg)
 	return c, cmd
 }
 
 // View renders the network list component
 func (c *NetworkListComponent) View() string {
-	// Render the list first
-	listView := c.list.View()
-
-	// Apply zone marking to each network item for mouse support
-	lines := strings.Split(listView, "\n")
-	var markedLines []string
-
-	itemIndex := 0
-	for _, line := range lines {
-		// Check if this line contains a network item (has content and isn't just formatting)
-		if strings.TrimSpace(line) != "" &&
-			!strings.Contains(line, "Network Configuration") &&
-			!strings.Contains(line, "Help") &&
-			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "🌐") || strings.Contains(line, "🔙") || strings.Contains(line, "➕")) {
-
-			// Mark this line as clickable
-			zoneID := fmt.Sprintf("network-item-%d", itemIndex)
-			markedLine := zone.Mark(zoneID, line)
-			markedLines = append(markedLines, markedLine)
-			itemIndex++
-		} else {
-			markedLines = append(markedLines, line)
-		}
-	}
-
-	return appStyle.Render(strings.Join(markedLines, "\n"))
+	// Use zone.Scan to wrap the list view for mouse support
+	return zone.Scan(appStyle.Render(c.list.View()))
 }
 
 // Network-related messages

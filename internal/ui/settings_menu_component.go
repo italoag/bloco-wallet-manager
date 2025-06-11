@@ -1,9 +1,6 @@
 package ui
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,14 +18,15 @@ type SettingsMenuComponent struct {
 
 // settingsItem represents a settings menu item
 type settingsItem struct {
+	id          string
 	title       string
 	description string
 	index       int
 }
 
-func (i settingsItem) Title() string       { return i.title }
+func (i settingsItem) Title() string       { return zone.Mark(i.id, i.title) }
 func (i settingsItem) Description() string { return i.description }
-func (i settingsItem) FilterValue() string { return i.title }
+func (i settingsItem) FilterValue() string { return zone.Mark(i.id, i.title) }
 
 // settingsKeyMap defines key bindings for the settings menu
 type settingsKeyMap struct {
@@ -55,13 +53,14 @@ func newSettingsKeyMap() *settingsKeyMap {
 // NewSettingsMenuComponent creates a new settings menu component
 func NewSettingsMenuComponent() SettingsMenuComponent {
 	items := []list.Item{
-		settingsItem{title: "🌐 Network Configuration", description: "Configure networks and RPC endpoints", index: 0},
-		settingsItem{title: "🌍 Language", description: "Change interface language", index: 1},
-		settingsItem{title: "🔙 Back to Main Menu", description: "Return to the main menu", index: 2},
+		settingsItem{id: "settings_network", title: "🌐 Network Configuration", description: "Configure networks and RPC endpoints", index: 0},
+		settingsItem{id: "settings_language", title: "🌍 Language", description: "Change interface language", index: 1},
+		settingsItem{id: "settings_back", title: "🔙 Back to Main Menu", description: "Return to the main menu", index: 2},
 	}
 
 	keys := newSettingsKeyMap()
-	delegate := newSettingsDelegate(keys)
+	// Use default delegate instead of custom delegate to avoid conflicts
+	delegate := list.NewDefaultDelegate()
 	settingsList := list.New(items, delegate, 0, 0)
 	settingsList.Title = "⚙️  Settings"
 	settingsList.Styles.Title = titleStyle
@@ -73,37 +72,6 @@ func NewSettingsMenuComponent() SettingsMenuComponent {
 		list: settingsList,
 		keys: keys,
 	}
-}
-
-// newSettingsDelegate creates a delegate for the settings list
-func newSettingsDelegate(keys *settingsKeyMap) list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
-
-	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		var item settingsItem
-		var ok bool
-
-		if i := m.SelectedItem(); i != nil {
-			item, ok = i.(settingsItem)
-			if !ok {
-				return nil
-			}
-		}
-
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch {
-			case key.Matches(msg, keys.choose):
-				return func() tea.Msg {
-					return SettingsItemSelectedMsg{Index: item.index, Item: item.title}
-				}
-			}
-		}
-
-		return nil
-	}
-
-	return d
 }
 
 // SetSize updates the component size
@@ -131,8 +99,6 @@ func (c *SettingsMenuComponent) GetSelectedItem() string {
 
 // Update handles messages for the settings menu component
 func (c *SettingsMenuComponent) Update(msg tea.Msg) (*SettingsMenuComponent, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		c.width = msg.Width
@@ -140,21 +106,38 @@ func (c *SettingsMenuComponent) Update(msg tea.Msg) (*SettingsMenuComponent, tea
 		c.list.SetSize(msg.Width, msg.Height)
 
 	case tea.MouseMsg:
-		// Check if any settings item was clicked
-		for i := 0; i < len(c.list.Items()); i++ {
-			itemZoneID := fmt.Sprintf("settings-item-%d", i)
-			if zone.Get(itemZoneID).InBounds(msg) {
-				// Select and activate the clicked item
-				c.list.Select(i)
-				if item, ok := c.list.SelectedItem().(settingsItem); ok {
-					return c, func() tea.Msg { return SettingsItemSelectedMsg{Index: item.index, Item: item.title} }
+		if msg.Button == tea.MouseButtonWheelUp {
+			c.list.CursorUp()
+			return c, nil
+		}
+
+		if msg.Button == tea.MouseButtonWheelDown {
+			c.list.CursorDown()
+			return c, nil
+		}
+
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			for i, listItem := range c.list.VisibleItems() {
+				v, _ := listItem.(settingsItem)
+				// Check each item to see if it's in bounds.
+				if zone.Get(v.id).InBounds(msg) {
+					// If so, select it in the list.
+					c.list.Select(i)
+					// Trigger selection action
+					return c, func() tea.Msg { return SettingsItemSelectedMsg{Index: v.index, Item: v.title} }
 				}
 			}
 		}
 
+		return c, nil
+
 	case tea.KeyMsg:
 		// Handle number shortcuts
 		switch msg.String() {
+		case "enter":
+			if item, ok := c.list.SelectedItem().(settingsItem); ok {
+				return c, func() tea.Msg { return SettingsItemSelectedMsg{Index: item.index, Item: item.title} }
+			}
 		case "1":
 			c.list.Select(0)
 			if item, ok := c.list.SelectedItem().(settingsItem); ok {
@@ -178,39 +161,15 @@ func (c *SettingsMenuComponent) Update(msg tea.Msg) (*SettingsMenuComponent, tea
 		}
 	}
 
-	// Update the list
+	var cmd tea.Cmd
 	c.list, cmd = c.list.Update(msg)
 	return c, cmd
 }
 
 // View renders the settings menu component
 func (c *SettingsMenuComponent) View() string {
-	// Render the list first
-	listView := c.list.View()
-
-	// Apply zone marking to each settings item for mouse support
-	lines := strings.Split(listView, "\n")
-	var markedLines []string
-
-	itemIndex := 0
-	for _, line := range lines {
-		// Check if this line contains a settings item (has content and isn't just formatting)
-		if strings.TrimSpace(line) != "" &&
-			!strings.Contains(line, "Settings") &&
-			!strings.Contains(line, "Help") &&
-			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "🌐") || strings.Contains(line, "🗣️") || strings.Contains(line, "🔙")) {
-
-			// Mark this line as clickable
-			zoneID := fmt.Sprintf("settings-item-%d", itemIndex)
-			markedLine := zone.Mark(zoneID, line)
-			markedLines = append(markedLines, markedLine)
-			itemIndex++
-		} else {
-			markedLines = append(markedLines, line)
-		}
-	}
-
-	return appStyle.Render(strings.Join(markedLines, "\n"))
+	// Use zone.Scan to wrap the list view for mouse support
+	return zone.Scan(appStyle.Render(c.list.View()))
 }
 
 // SettingsItemSelectedMsg is sent when a settings item is selected

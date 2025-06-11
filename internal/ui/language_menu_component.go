@@ -3,7 +3,6 @@ package ui
 import (
 	"blocowallet/pkg/config"
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -23,15 +22,16 @@ type LanguageMenuComponent struct {
 
 // languageItem represents a language item
 type languageItem struct {
+	id          string
 	title       string
 	description string
 	code        string
 	isCurrent   bool
 }
 
-func (i languageItem) Title() string       { return i.title }
+func (i languageItem) Title() string       { return zone.Mark(i.id, i.title) }
 func (i languageItem) Description() string { return i.description }
-func (i languageItem) FilterValue() string { return i.title }
+func (i languageItem) FilterValue() string { return zone.Mark(i.id, i.title) }
 
 // languageKeyMap defines key bindings for the language menu
 type languageKeyMap struct {
@@ -58,7 +58,8 @@ func newLanguageKeyMap() *languageKeyMap {
 // NewLanguageMenuComponent creates a new language menu component
 func NewLanguageMenuComponent(cfg *config.Config) LanguageMenuComponent {
 	keys := newLanguageKeyMap()
-	delegate := newLanguageDelegate(keys)
+	// Use default delegate instead of custom delegate to avoid conflicts
+	delegate := list.NewDefaultDelegate()
 
 	languageList := list.New([]list.Item{}, delegate, 0, 0)
 	languageList.Title = "🌍 Language Selection"
@@ -77,43 +78,12 @@ func NewLanguageMenuComponent(cfg *config.Config) LanguageMenuComponent {
 	return c
 }
 
-// newLanguageDelegate creates a delegate for the language list
-func newLanguageDelegate(keys *languageKeyMap) list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
-
-	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		var item languageItem
-		var ok bool
-
-		if i := m.SelectedItem(); i != nil {
-			item, ok = i.(languageItem)
-			if !ok {
-				return nil
-			}
-		}
-
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch {
-			case key.Matches(msg, keys.choose):
-				return func() tea.Msg {
-					return LanguageSelectedMsg{Code: item.code}
-				}
-			}
-		}
-
-		return nil
-	}
-
-	return d
-}
-
 // RefreshLanguages updates the language list with current languages
 func (c *LanguageMenuComponent) RefreshLanguages() {
 	var items []list.Item
 
 	langCodes := c.config.GetLanguageCodes()
-	for _, code := range langCodes {
+	for i, code := range langCodes {
 		name := config.SupportedLanguages[code]
 		isCurrent := c.config.Language == code
 
@@ -125,6 +95,7 @@ func (c *LanguageMenuComponent) RefreshLanguages() {
 		}
 
 		items = append(items, languageItem{
+			id:          fmt.Sprintf("lang_%s_%d", code, i),
 			title:       title,
 			description: description,
 			code:        code,
@@ -134,6 +105,7 @@ func (c *LanguageMenuComponent) RefreshLanguages() {
 
 	// Add back button
 	items = append(items, languageItem{
+		id:          "lang_back_to_settings",
 		title:       "🔙 Back to Settings",
 		description: "Return to the settings menu",
 		code:        "back-to-settings",
@@ -159,8 +131,6 @@ func (c *LanguageMenuComponent) GetSelected() string {
 
 // Update handles messages for the language menu component
 func (c *LanguageMenuComponent) Update(msg tea.Msg) (*LanguageMenuComponent, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		c.width = msg.Width
@@ -168,59 +138,52 @@ func (c *LanguageMenuComponent) Update(msg tea.Msg) (*LanguageMenuComponent, tea
 		c.list.SetSize(msg.Width, msg.Height)
 
 	case tea.MouseMsg:
-		// Check if any language item was clicked
-		for i := 0; i < len(c.list.Items()); i++ {
-			itemZoneID := fmt.Sprintf("language-item-%d", i)
-			if zone.Get(itemZoneID).InBounds(msg) {
-				// Select and activate the clicked item
-				c.list.Select(i)
-				if item, ok := c.list.SelectedItem().(languageItem); ok {
-					return c, func() tea.Msg { return LanguageSelectedMsg{Code: item.code} }
+		if msg.Button == tea.MouseButtonWheelUp {
+			c.list.CursorUp()
+			return c, nil
+		}
+
+		if msg.Button == tea.MouseButtonWheelDown {
+			c.list.CursorDown()
+			return c, nil
+		}
+
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			for i, listItem := range c.list.VisibleItems() {
+				v, _ := listItem.(languageItem)
+				// Check each item to see if it's in bounds.
+				if zone.Get(v.id).InBounds(msg) {
+					// If so, select it in the list.
+					c.list.Select(i)
+					// Trigger selection action
+					return c, func() tea.Msg { return LanguageSelectedMsg{Code: v.code} }
 				}
 			}
 		}
 
+		return c, nil
+
 	case tea.KeyMsg:
 		// Handle escape key
 		switch msg.String() {
+		case "enter":
+			if item, ok := c.list.SelectedItem().(languageItem); ok {
+				return c, func() tea.Msg { return LanguageSelectedMsg{Code: item.code} }
+			}
 		case "esc", "q":
 			return c, func() tea.Msg { return BackToSettingsMsg{} }
 		}
 	}
 
-	// Update the list
+	var cmd tea.Cmd
 	c.list, cmd = c.list.Update(msg)
 	return c, cmd
 }
 
 // View renders the language menu component
 func (c *LanguageMenuComponent) View() string {
-	// Render the list first
-	listView := c.list.View()
-
-	// Apply zone marking to each language item for mouse support
-	lines := strings.Split(listView, "\n")
-	var markedLines []string
-
-	itemIndex := 0
-	for _, line := range lines {
-		// Check if this line contains a language item (has content and isn't just formatting)
-		if strings.TrimSpace(line) != "" &&
-			!strings.Contains(line, "Language") &&
-			!strings.Contains(line, "Help") &&
-			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "🗣️") || strings.Contains(line, "🔙")) {
-
-			// Mark this line as clickable
-			zoneID := fmt.Sprintf("language-item-%d", itemIndex)
-			markedLine := zone.Mark(zoneID, line)
-			markedLines = append(markedLines, markedLine)
-			itemIndex++
-		} else {
-			markedLines = append(markedLines, line)
-		}
-	}
-
-	return appStyle.Render(strings.Join(markedLines, "\n"))
+	// Use zone.Scan to wrap the list view for mouse support
+	return zone.Scan(appStyle.Render(c.list.View()))
 }
 
 // Language-related messages
