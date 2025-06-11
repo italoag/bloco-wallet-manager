@@ -120,6 +120,9 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 		loading:       false,
 		currentView:   SplashView,
 
+		// Mouse support
+		zoneID: zone.NewPrefix(),
+
 		// Initialize components
 		splashComponent:           NewSplashComponent(),
 		mainMenuComponent:         NewMainMenuComponent(),
@@ -1028,10 +1031,12 @@ func (m Model) View() string {
 			dialog,
 		)
 
-		return centeredDialog
+		// Apply zone scanning for mouse interaction
+		return zone.Scan(centeredDialog)
 	}
 
-	return baseView
+	// Apply zone scanning for mouse interaction
+	return zone.Scan(baseView)
 }
 
 // Render methods

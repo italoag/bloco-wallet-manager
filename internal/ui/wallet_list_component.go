@@ -2,6 +2,7 @@ package ui
 
 import (
 	"blocowallet/internal/wallet"
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -70,7 +71,8 @@ func (c *WalletListComponent) Update(msg tea.Msg) (*WalletListComponent, tea.Cmd
 
 		// Check clicks on wallet items
 		for i := range c.wallets {
-			if zone.Get(c.id + "-wallet-" + string(rune(i))).InBounds(msg) {
+			walletZoneID := fmt.Sprintf("%s-wallet-%d", c.id, i)
+			if zone.Get(walletZoneID).InBounds(msg) {
 				c.selected = i
 				return c, func() tea.Msg { return WalletSelectedMsg{Wallet: c.wallets[i]} }
 			}
@@ -117,7 +119,8 @@ func (c *WalletListComponent) View() string {
 		}
 
 		// Mark zone for mouse interaction
-		b.WriteString(zone.Mark(c.id+"-wallet-"+string(rune(i)), itemText))
+		walletZoneID := fmt.Sprintf("%s-wallet-%d", c.id, i)
+		b.WriteString(zone.Mark(walletZoneID, itemText))
 		if i < len(c.wallets)-1 {
 			b.WriteString("\n")
 		}

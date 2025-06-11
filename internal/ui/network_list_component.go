@@ -1,12 +1,14 @@
 package ui
 
 import (
-	"fmt"
 	"blocowallet/pkg/config"
+	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // NetworkListComponent represents the network list component
@@ -77,7 +79,7 @@ func newNetworkKeyMap() *networkKeyMap {
 func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 	keys := newNetworkKeyMap()
 	delegate := newNetworkDelegate(keys)
-	
+
 	networkList := list.New([]list.Item{}, delegate, 0, 0)
 	networkList.Title = "🌐 Network Configuration"
 	networkList.Styles.Title = titleStyle
@@ -90,7 +92,7 @@ func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 		keys:   keys,
 		config: cfg,
 	}
-	
+
 	c.RefreshNetworks()
 	return c
 }
@@ -147,7 +149,7 @@ func newNetworkDelegate(keys *networkKeyMap) list.DefaultDelegate {
 // RefreshNetworks updates the network list with current networks
 func (c *NetworkListComponent) RefreshNetworks() {
 	var items []list.Item
-	
+
 	networkKeys := c.config.GetAllNetworkKeys()
 	for _, key := range networkKeys {
 		if network, exists := c.config.GetNetworkByKey(key); exists {
@@ -159,10 +161,10 @@ func (c *NetworkListComponent) RefreshNetworks() {
 			if network.IsCustom {
 				customTag = " [Custom]"
 			}
-			
+
 			title := fmt.Sprintf("%s%s%s", network.Name, status, customTag)
 			description := fmt.Sprintf("Chain ID: %d • %s", network.ChainID, network.RPCEndpoint)
-			
+
 			items = append(items, networkItem{
 				title:       title,
 				description: description,
@@ -171,20 +173,20 @@ func (c *NetworkListComponent) RefreshNetworks() {
 			})
 		}
 	}
-	
+
 	// Add special items
 	items = append(items, networkItem{
 		title:       "➕ Add Custom Network",
 		description: "Add a new custom network configuration",
 		key:         "add-network",
 	})
-	
+
 	items = append(items, networkItem{
 		title:       "🔙 Back to Settings",
 		description: "Return to the settings menu",
 		key:         "back-to-settings",
 	})
-	
+
 	c.list.SetItems(items)
 }
 
@@ -213,6 +215,19 @@ func (c *NetworkListComponent) Update(msg tea.Msg) (*NetworkListComponent, tea.C
 		c.height = msg.Height
 		c.list.SetSize(msg.Width, msg.Height)
 
+	case tea.MouseMsg:
+		// Check if any network item was clicked
+		for i := 0; i < len(c.list.Items()); i++ {
+			itemZoneID := fmt.Sprintf("network-item-%d", i)
+			if zone.Get(itemZoneID).InBounds(msg) {
+				// Select and activate the clicked item
+				c.list.Select(i)
+				if item, ok := c.list.SelectedItem().(networkItem); ok {
+					return c, func() tea.Msg { return NetworkSelectedMsg{Key: item.key, Network: item.network} }
+				}
+			}
+		}
+
 	case tea.KeyMsg:
 		// Handle number shortcuts for quick navigation
 		switch msg.String() {
@@ -228,7 +243,32 @@ func (c *NetworkListComponent) Update(msg tea.Msg) (*NetworkListComponent, tea.C
 
 // View renders the network list component
 func (c *NetworkListComponent) View() string {
-	return appStyle.Render(c.list.View())
+	// Render the list first
+	listView := c.list.View()
+
+	// Apply zone marking to each network item for mouse support
+	lines := strings.Split(listView, "\n")
+	var markedLines []string
+
+	itemIndex := 0
+	for _, line := range lines {
+		// Check if this line contains a network item (has content and isn't just formatting)
+		if strings.TrimSpace(line) != "" &&
+			!strings.Contains(line, "Network Configuration") &&
+			!strings.Contains(line, "Help") &&
+			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "🌐") || strings.Contains(line, "🔙") || strings.Contains(line, "➕")) {
+
+			// Mark this line as clickable
+			zoneID := fmt.Sprintf("network-item-%d", itemIndex)
+			markedLine := zone.Mark(zoneID, line)
+			markedLines = append(markedLines, markedLine)
+			itemIndex++
+		} else {
+			markedLines = append(markedLines, line)
+		}
+	}
+
+	return appStyle.Render(strings.Join(markedLines, "\n"))
 }
 
 // Network-related messages

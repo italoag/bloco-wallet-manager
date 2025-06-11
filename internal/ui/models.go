@@ -42,6 +42,9 @@ type Model struct {
 	currentBalance      *wallet.Balance
 	currentMultiBalance *wallet.MultiNetworkBalance
 
+	// Mouse support
+	zoneID string
+
 	// Configuration
 	config *config.Config
 

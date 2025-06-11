@@ -1,10 +1,14 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // MainMenuComponent represents the main menu component
@@ -152,6 +156,19 @@ func (c *MainMenuComponent) Update(msg tea.Msg) (*MainMenuComponent, tea.Cmd) {
 		c.height = msg.Height
 		c.list.SetSize(msg.Width, msg.Height)
 
+	case tea.MouseMsg:
+		// Check if any menu item was clicked
+		for i := 0; i < len(c.list.Items()); i++ {
+			itemZoneID := fmt.Sprintf("menu-item-%d", i)
+			if zone.Get(itemZoneID).InBounds(msg) {
+				// Select and activate the clicked item
+				c.list.Select(i)
+				if item, ok := c.list.SelectedItem().(menuItem); ok {
+					return c, func() tea.Msg { return MenuItemSelectedMsg{Index: item.index, Item: item.title} }
+				}
+			}
+		}
+
 	case tea.KeyMsg:
 		// Handle number shortcuts
 		switch msg.String() {
@@ -216,7 +233,33 @@ func (c *MainMenuComponent) Update(msg tea.Msg) (*MainMenuComponent, tea.Cmd) {
 
 // View renders the main menu component
 func (c *MainMenuComponent) View() string {
-	return appStyle.Render(c.list.View())
+	// Render the list first
+	listView := c.list.View()
+
+	// Apply zone marking to each menu item for mouse support
+	// We need to parse the list view and mark each item
+	lines := strings.Split(listView, "\n")
+	var markedLines []string
+
+	itemIndex := 0
+	for _, line := range lines {
+		// Check if this line contains a menu item (has content and isn't just formatting)
+		if strings.TrimSpace(line) != "" &&
+			!strings.Contains(line, "BlockoWallet - Main Menu") &&
+			!strings.Contains(line, "Help") &&
+			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "📋") || strings.Contains(line, "➕") || strings.Contains(line, "📥") || strings.Contains(line, "🔑") || strings.Contains(line, "⚙️") || strings.Contains(line, "❌")) {
+
+			// Mark this line as clickable
+			zoneID := fmt.Sprintf("menu-item-%d", itemIndex)
+			markedLine := zone.Mark(zoneID, line)
+			markedLines = append(markedLines, markedLine)
+			itemIndex++
+		} else {
+			markedLines = append(markedLines, line)
+		}
+	}
+
+	return appStyle.Render(strings.Join(markedLines, "\n"))
 }
 
 // MenuItemSelectedMsg is sent when a menu item is selected

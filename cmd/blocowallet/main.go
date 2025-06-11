@@ -13,9 +13,13 @@ import (
 	"blocowallet/pkg/logger"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 func main() {
+	// Initialize global zone manager for mouse interactions
+	zone.NewGlobal()
+
 	// Initialize logger first - use error level to avoid interfering with TUI
 	appLogger, err := logger.NewLogger("error")
 	if err != nil {

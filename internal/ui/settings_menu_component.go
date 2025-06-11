@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // SettingsMenuComponent represents the settings menu component
@@ -135,6 +139,19 @@ func (c *SettingsMenuComponent) Update(msg tea.Msg) (*SettingsMenuComponent, tea
 		c.height = msg.Height
 		c.list.SetSize(msg.Width, msg.Height)
 
+	case tea.MouseMsg:
+		// Check if any settings item was clicked
+		for i := 0; i < len(c.list.Items()); i++ {
+			itemZoneID := fmt.Sprintf("settings-item-%d", i)
+			if zone.Get(itemZoneID).InBounds(msg) {
+				// Select and activate the clicked item
+				c.list.Select(i)
+				if item, ok := c.list.SelectedItem().(settingsItem); ok {
+					return c, func() tea.Msg { return SettingsItemSelectedMsg{Index: item.index, Item: item.title} }
+				}
+			}
+		}
+
 	case tea.KeyMsg:
 		// Handle number shortcuts
 		switch msg.String() {
@@ -168,7 +185,32 @@ func (c *SettingsMenuComponent) Update(msg tea.Msg) (*SettingsMenuComponent, tea
 
 // View renders the settings menu component
 func (c *SettingsMenuComponent) View() string {
-	return appStyle.Render(c.list.View())
+	// Render the list first
+	listView := c.list.View()
+
+	// Apply zone marking to each settings item for mouse support
+	lines := strings.Split(listView, "\n")
+	var markedLines []string
+
+	itemIndex := 0
+	for _, line := range lines {
+		// Check if this line contains a settings item (has content and isn't just formatting)
+		if strings.TrimSpace(line) != "" &&
+			!strings.Contains(line, "Settings") &&
+			!strings.Contains(line, "Help") &&
+			(strings.Contains(line, "►") || strings.Contains(line, "•") || strings.Contains(line, "🌐") || strings.Contains(line, "🗣️") || strings.Contains(line, "🔙")) {
+
+			// Mark this line as clickable
+			zoneID := fmt.Sprintf("settings-item-%d", itemIndex)
+			markedLine := zone.Mark(zoneID, line)
+			markedLines = append(markedLines, markedLine)
+			itemIndex++
+		} else {
+			markedLines = append(markedLines, line)
+		}
+	}
+
+	return appStyle.Render(strings.Join(markedLines, "\n"))
 }
 
 // SettingsItemSelectedMsg is sent when a settings item is selected
