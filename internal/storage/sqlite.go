@@ -35,9 +35,9 @@ func NewSQLite(databasePath string, log logger.Logger) (*SQLite, error) {
 		logger: log,
 	}
 
-	log.Info("Initializing SQLite database",
-		logger.String("database_path", databasePath),
-		logger.String("operation", "initialize_database"))
+	// log.Info("Initializing SQLite database",
+	// 	logger.String("database_path", databasePath),
+	// 	logger.String("operation", "initialize_database"))
 
 	if err := sqlite.createTables(); err != nil {
 		log.Error("Failed to create database tables",
@@ -47,9 +47,9 @@ func NewSQLite(databasePath string, log logger.Logger) (*SQLite, error) {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	log.Info("SQLite database initialized successfully",
-		logger.String("database_path", databasePath),
-		logger.String("operation", "initialize_database"))
+	// log.Info("SQLite database initialized successfully",
+	// 	logger.String("database_path", databasePath),
+	// 	logger.String("operation", "initialize_database"))
 
 	return sqlite, nil
 }
@@ -105,10 +105,10 @@ func (s *SQLite) Create(ctx context.Context, w *wallet.Wallet) error {
 		return fmt.Errorf("failed to create wallet: %w", err)
 	}
 
-	s.logger.Info("Wallet saved to database successfully",
-		logger.String("correlation_id", correlationID),
-		logger.String("wallet_id", w.ID),
-		logger.String("operation", "db_create_wallet"))
+	// s.logger.Info("Wallet saved to database successfully",
+	// 	logger.String("correlation_id", correlationID),
+	// 	logger.String("wallet_id", w.ID),
+	// 	logger.String("operation", "db_create_wallet"))
 
 	return nil
 }

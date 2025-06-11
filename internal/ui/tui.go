@@ -6,7 +6,6 @@ import (
 	"blocowallet/pkg/config"
 	"context"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"os"
@@ -182,16 +181,6 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 
 // loadDefaultFont loads a default TDF font for the splash screen
 func (m *Model) loadDefaultFont() {
-	log.Println("Starting TDF font loading...")
-
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Printf("Error getting cwd: %v", err)
-		return
-	}
-	log.Printf("Current working directory: %s", cwd)
-
 	// Try different possible paths for fonts directory
 	fontBasePaths := []string{
 		"fonts",                // If running from project root
@@ -212,17 +201,11 @@ func (m *Model) loadDefaultFont() {
 	for _, basePath := range fontBasePaths {
 		for _, fontName := range fontNames {
 			fontPath := filepath.Join(basePath, fontName)
-			log.Printf("Attempting to load font: %s", fontPath)
 
 			// Check if file exists first
 			if _, err := os.Stat(fontPath); os.IsNotExist(err) {
-				log.Printf("Font file does not exist: %s", fontPath)
 				continue
 			}
-
-			// Try absolute path as well
-			absPath, _ := filepath.Abs(fontPath)
-			log.Printf("Absolute path: %s", absPath)
 
 			fontInfo := &tdf.FontInfo{
 				Path:    fontPath,
@@ -233,17 +216,13 @@ func (m *Model) loadDefaultFont() {
 			if fontFile, err := tdf.LoadFont(fontInfo); err == nil && len(fontFile.Fonts) > 0 {
 				m.selectedFont = &fontFile.Fonts[0] // Use the first font in the file
 				m.fontName = filepath.Base(fontPath)
-				log.Printf("Successfully loaded TDF font: %s (contains %d fonts)", fontPath, len(fontFile.Fonts))
 				return
-			} else {
-				log.Printf("Failed to load font %s: %v", fontPath, err)
 			}
 		}
 	}
 
 	// If no font loads successfully, selectedFont will remain nil
 	// and renderSplash will fall back to text rendering
-	log.Println("No TDF fonts could be loaded, using fallback text rendering")
 }
 
 // Init initializes the TUI

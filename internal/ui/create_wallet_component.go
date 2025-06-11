@@ -11,14 +11,12 @@ import (
 
 // CreateWalletComponent represents the wallet creation component
 type CreateWalletComponent struct {
-	id       string
-	form     *huh.Form
-	width    int
-	height   int
-	err      error
-	creating bool
-
-	// Form values
+	id         string
+	form       *huh.Form
+	width      int
+	height     int
+	err        error
+	creating   bool
 	walletName string
 	password   string
 }
@@ -34,19 +32,36 @@ func NewCreateWalletComponent() CreateWalletComponent {
 
 // initForm initializes the huh form
 func (c *CreateWalletComponent) initForm() {
+	// Reset the variables
+	c.walletName = ""
+	c.password = ""
+
+	// Create form with Value() pointing to our variables
 	c.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Key("walletName").
 				Title("Wallet Name").
 				Placeholder("Enter wallet name...").
-				Value(&c.walletName),
+				Value(&c.walletName).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("wallet name cannot be empty")
+					}
+					return nil
+				}),
 			huh.NewInput().
 				Key("password").
 				Title("Password").
 				Placeholder("Enter password...").
+				Value(&c.password).
 				EchoMode(huh.EchoModePassword).
-				Value(&c.password),
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("password cannot be empty")
+					}
+					return nil
+				}),
 		),
 	).WithWidth(60).WithShowHelp(false).WithShowErrors(false)
 }
@@ -73,18 +88,22 @@ func (c *CreateWalletComponent) SetCreating(creating bool) {
 
 // GetWalletName returns the entered wallet name
 func (c *CreateWalletComponent) GetWalletName() string {
-	return c.walletName
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("walletName"))
+	}
+	return strings.TrimSpace(c.walletName)
 }
 
 // GetPassword returns the entered password
 func (c *CreateWalletComponent) GetPassword() string {
-	return c.password
+	if c.form != nil {
+		return strings.TrimSpace(c.form.GetString("password"))
+	}
+	return strings.TrimSpace(c.password)
 }
 
 // Reset clears all inputs
 func (c *CreateWalletComponent) Reset() {
-	c.walletName = ""
-	c.password = ""
 	c.err = nil
 	c.creating = false
 	c.initForm()
@@ -119,43 +138,29 @@ func (c *CreateWalletComponent) Update(msg tea.Msg) (*CreateWalletComponent, tea
 		c.SetError(fmt.Errorf("%s", string(msg)))
 	}
 
-	// Update the form
+	// Process the form - exactly like the example
 	form, cmd := c.form.Update(msg)
 	if f, ok := form.(*huh.Form); ok {
 		c.form = f
 		cmds = append(cmds, cmd)
 	}
-
-	// Check if form is completed
+	// Check if form is completed - exactly like the example
 	if c.form.State == huh.StateCompleted {
-		if c.validateInputs() {
-			c.creating = true
-			return c, func() tea.Msg {
-				return CreateWalletRequestMsg{
-					Name:     c.GetWalletName(),
-					Password: c.GetPassword(),
-				}
+		// Get values directly from form instead of variables
+		walletName := strings.TrimSpace(c.form.GetString("walletName"))
+		password := strings.TrimSpace(c.form.GetString("password"))
+
+		// Create wallet if form is valid (form validation handles empty values)
+		c.creating = true
+		return c, func() tea.Msg {
+			return CreateWalletRequestMsg{
+				Name:     walletName,
+				Password: password,
 			}
 		}
-		// Reset form state if validation failed
-		c.form.State = huh.StateNormal
 	}
 
 	return c, tea.Batch(cmds...)
-}
-
-// validateInputs checks if the inputs are valid
-func (c *CreateWalletComponent) validateInputs() bool {
-	if strings.TrimSpace(c.walletName) == "" {
-		c.err = fmt.Errorf("Wallet name cannot be empty")
-		return false
-	}
-	if strings.TrimSpace(c.password) == "" {
-		c.err = fmt.Errorf("Password cannot be empty")
-		return false
-	}
-	c.err = nil
-	return true
 }
 
 // View renders the create wallet component
@@ -182,8 +187,18 @@ func (c *CreateWalletComponent) View() string {
 		b.WriteString(ErrorStyle.Render("❌ Error: " + c.err.Error()))
 	}
 
+	// Show form errors if any
+	errors := c.form.Errors()
+	if len(errors) > 0 {
+		b.WriteString("\n")
+		for _, err := range errors {
+			b.WriteString(ErrorStyle.Render("❌ " + err.Error()))
+			b.WriteString("\n")
+		}
+	}
+
 	// Instructions
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 	b.WriteString(InfoStyle.Render("💡 Your wallet will be secured with a mnemonic phrase."))
 	b.WriteString("\n")
 	b.WriteString(InfoStyle.Render("   Make sure to save it in a secure location!"))
