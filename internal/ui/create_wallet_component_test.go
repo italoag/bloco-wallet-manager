@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -100,11 +101,26 @@ func TestCreateWalletComponent_Reset(t *testing.T) {
 func TestCreateWalletComponent_FormCompletion(t *testing.T) {
 	component := NewCreateWalletComponent()
 
-	// Set values directly to the component variables
-	component.walletName = "test wallet"
-	component.password = "password123"
+	// Simulate form completion by setting form state and values
+	component.form.State = huh.StateCompleted
 
-	// Set form state to completed to simulate completion
+	// Mock form values by creating a new form with pre-filled values
+	testName := "test wallet"
+	testPassword := "password123"
+
+	component.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Key("walletName").
+				Title("Wallet Name").
+				Value(&testName),
+			huh.NewInput().
+				Key("password").
+				Title("Password").
+				Value(&testPassword).
+				EchoMode(huh.EchoModePassword),
+		),
+	).WithShowHelp(false).WithShowErrors(false)
 	component.form.State = huh.StateCompleted
 
 	// Update should trigger wallet creation
@@ -129,6 +145,15 @@ func TestCreateWalletComponent_FormCompletion(t *testing.T) {
 		}
 	} else {
 		t.Error("Expected CreateWalletRequestMsg from form completion")
+	}
+
+	// Test that subsequent updates don't trigger creation again (preventing duplicates)
+	_, cmd2 := updatedComponent.Update(tea.KeyMsg{})
+	if cmd2 != nil {
+		msg2 := cmd2()
+		if _, ok := msg2.(CreateWalletRequestMsg); ok {
+			t.Error("Should not create duplicate CreateWalletRequestMsg when already creating")
+		}
 	}
 }
 
@@ -198,23 +223,7 @@ func TestCreateWalletComponent_View(t *testing.T) {
 	}
 
 	// Check for basic elements
-	if !contains(view, "Create New Wallet") {
+	if !strings.Contains(view, "Create New Wallet") {
 		t.Error("Expected view to contain title")
 	}
-}
-
-// Helper function to check if string contains substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			containsSubstring(s, substr)))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
