@@ -390,6 +390,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
+		// Only call handleKeyMsg for views that don't use modern components
+		// or for keys that components don't handle
+		if m.currentView == MenuView || m.currentView == SettingsView ||
+			m.currentView == NetworkConfigView || m.currentView == LanguageView ||
+			m.currentView == AddNetworkView || m.currentView == CreateWalletView ||
+			m.currentView == ImportWalletView || m.currentView == ImportPrivateKeyView {
+			// These views use modern components that handle their own keys
+			// Only override for escape key and other special cases
+			if msg.String() == "esc" || msg.String() == "q" || msg.String() == "ctrl+c" {
+				return m.handleKeyMsg(msg)
+			}
+			// For other keys, let the component command execute
+			return m, cmd
+		}
 		return m.handleKeyMsg(msg)
 
 	case walletsLoadedMsg:
@@ -528,7 +542,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 // handleKeyMsg handles keyboard input
@@ -715,11 +729,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEnterKey()
 
 	case "up", "k":
-		if m.currentView == MenuView {
-			if m.selected > 0 {
-				m.selected--
-			}
-		} else if m.currentView == WalletListView {
+		if m.currentView == WalletListView {
 			if len(m.wallets) > 0 {
 				var cmd tea.Cmd
 				m.walletTable, cmd = m.walletTable.Update(msg)
@@ -747,9 +757,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "down", "j":
 		maxItems := 0
-		if m.currentView == MenuView {
-			maxItems = 5 // 6 menu items (0-5)
-		} else if m.currentView == WalletListView {
+		if m.currentView == WalletListView {
 			maxItems = len(m.wallets) - 1
 		} else if m.currentView == SettingsView {
 			maxItems = len(m.settingsItems) - 1
@@ -776,8 +784,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.walletTable, cmd = m.walletTable.Update(msg)
 			return m, cmd
-		} else if m.selected < maxItems {
-			m.selected++
 		}
 		return m, nil
 
@@ -1125,7 +1131,6 @@ func (m Model) renderSplash() string {
 	return b.String()
 }
 
-
 func (m Model) renderWalletList() string {
 	var contentParts []string
 
@@ -1399,9 +1404,6 @@ func (m Model) renderWalletDetails() string {
 
 	return lipgloss.JoinVertical(lipgloss.Left, finalParts...)
 }
-
-
-
 
 // refreshNetworkItems updates the network items list
 func (m *Model) refreshNetworkItems() {
