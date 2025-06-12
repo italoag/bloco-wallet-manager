@@ -1,6 +1,7 @@
 package localization
 
 import (
+	"blocowallet/pkg/config"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"os"
@@ -10,23 +11,36 @@ import (
 var Labels map[string]string
 
 func SetLanguage(lang string, appDir string) error {
+	// For backward compatibility, we'll still check for the old YAML files
 	labelsPath := filepath.Join(appDir, "locales", fmt.Sprintf("%s.yaml", lang))
 
 	if _, err := os.Stat(labelsPath); os.IsNotExist(err) {
-		err := createDefaultLabels(lang, labelsPath)
+		// If the old file doesn't exist, we'll use the new i18n system
+		// Initialize the i18n system if it's not already initialized
+		if bundle == nil {
+			cfg := &config.Config{
+				AppDir:    appDir,
+				Language:  lang,
+				LocaleDir: filepath.Join(appDir, "locale"),
+			}
+			if err := InitLocalization(cfg); err != nil {
+				return err
+			}
+		} else {
+			// Just change the language
+			ChangeLanguage(lang)
+		}
+	} else {
+		// For backward compatibility, still load the old YAML files
+		labelsFile, err := os.ReadFile(labelsPath)
 		if err != nil {
 			return err
 		}
-	}
 
-	labelsFile, err := os.ReadFile(labelsPath)
-	if err != nil {
-		return err
-	}
-
-	err = yaml.Unmarshal(labelsFile, &Labels)
-	if err != nil {
-		return err
+		err = yaml.Unmarshal(labelsFile, &Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

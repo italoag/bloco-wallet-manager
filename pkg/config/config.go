@@ -11,6 +11,7 @@ type Config struct {
 	Language     string `yaml:"language"`
 	WalletsDir   string `yaml:"wallets_dir"`
 	DatabasePath string `yaml:"database_path"`
+	LocaleDir    string `yaml:"locale_dir"`
 }
 
 func LoadConfig(appDir string) (*Config, error) {
@@ -23,6 +24,7 @@ func LoadConfig(appDir string) (*Config, error) {
 			Language:     "en",
 			WalletsDir:   filepath.Join(appDir, "keystore"),
 			DatabasePath: filepath.Join(appDir, "wallets.db"),
+			LocaleDir:    filepath.Join(appDir, "locale"),
 		}
 
 		configData, err := yaml.Marshal(defaultConfig)
@@ -71,6 +73,12 @@ func LoadConfig(appDir string) (*Config, error) {
 		cfg.DatabasePath = expandPath(cfg.DatabasePath, homeDir)
 	} else {
 		cfg.DatabasePath = filepath.Join(appDir, "wallets.db")
+	}
+
+	if cfg.LocaleDir != "" {
+		cfg.LocaleDir = expandPath(cfg.LocaleDir, homeDir)
+	} else {
+		cfg.LocaleDir = filepath.Join(appDir, "locale")
 	}
 
 	return cfg, nil
