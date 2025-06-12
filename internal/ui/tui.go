@@ -969,10 +969,9 @@ func (m *CLIModel) updateWalletDetails(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.wallets = wallets
 				m.walletCount = len(wallets)
 
-				// Only initialize the table if there are wallets
-				if len(wallets) > 0 {
-					m.rebuildWalletsTable()
-				}
+				// Always rebuild the table, even if there are no wallets
+				// The rebuildWalletsTable method already has a check for empty wallets
+				m.rebuildWalletsTable()
 			}
 
 			return m, nil // Return explícito para consumir o evento de teclado
@@ -1151,15 +1150,10 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 		// Atualizar a contagem de wallets
 		m.walletCount = len(wallets)
 
-		// Reconstruir as linhas da tabela
-		var rows []table.Row
-		for _, w := range m.wallets {
-			rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
-		}
-
-		// Atualizar a tabela com as novas linhas apenas se houver wallets
-		if len(rows) > 0 {
-			m.walletTable.SetRows(rows)
+		// Se houver wallets, reconstruir a tabela completamente
+		// para garantir que ela seja inicializada corretamente
+		if len(m.wallets) > 0 {
+			m.rebuildWalletsTable()
 		}
 
 		// Retornar uma mensagem personalizada para indicar que a lista foi atualizada
