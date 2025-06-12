@@ -7,10 +7,28 @@ import (
 )
 
 type Config struct {
-	AppDir       string `yaml:"app_dir"`
-	Language     string `yaml:"language"`
-	WalletsDir   string `yaml:"wallets_dir"`
-	DatabasePath string `yaml:"database_path"`
+	AppDir       string             `yaml:"app_dir"`
+	Language     string             `yaml:"language"`
+	WalletsDir   string             `yaml:"wallets_dir"`
+	Database     DatabaseConfig     `yaml:"database"`
+	Networks     map[string]Network `yaml:"networks"`
+	DatabasePath string             `yaml:"database_path"`
+}
+
+type Network struct {
+	Name        string `yaml:"name"`
+	RPCEndpoint string `yaml:"rpc_endpoint"`
+	ChainID     int64  `yaml:"chain_id"`
+	Symbol      string `yaml:"symbol"`
+	Explorer    string `yaml:"explorer"`
+	IsActive    bool   `yaml:"is_active"`
+	IsCustom    bool   `yaml:"is_custom"`
+}
+
+type DatabaseConfig struct {
+	Type string `yaml:"type"` // sqlite, postgres
+	Path string `yaml:"path"` // for sqlite
+	URL  string `yaml:"url"`  // for postgres
 }
 
 func LoadConfig(appDir string) (*Config, error) {
