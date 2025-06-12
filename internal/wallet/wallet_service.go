@@ -1,7 +1,6 @@
-package usecases
+package wallet
 
 import (
-	"blocowallet/domain"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -14,18 +13,18 @@ import (
 )
 
 type WalletDetails struct {
-	Wallet     *domain.Wallet
+	Wallet     *Wallet
 	Mnemonic   string
 	PrivateKey *ecdsa.PrivateKey
 	PublicKey  *ecdsa.PublicKey
 }
 
 type WalletService struct {
-	Repo     domain.WalletRepository
+	Repo     WalletRepository
 	KeyStore *keystore.KeyStore
 }
 
-func NewWalletService(repo domain.WalletRepository, ks *keystore.KeyStore) *WalletService {
+func NewWalletService(repo WalletRepository, ks *keystore.KeyStore) *WalletService {
 	return &WalletService{
 		Repo:     repo,
 		KeyStore: ks,
@@ -61,7 +60,7 @@ func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
-	wallet := &domain.Wallet{
+	wallet := &Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
@@ -110,7 +109,7 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
-	wallet := &domain.Wallet{
+	wallet := &Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
@@ -172,7 +171,7 @@ func (ws *WalletService) ImportWalletFromPrivateKey(privateKeyHex, password stri
 	}
 
 	// Create the wallet entry with the generated mnemonic
-	wallet := &domain.Wallet{
+	wallet := &Wallet{
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the generated mnemonic
@@ -195,7 +194,7 @@ func (ws *WalletService) ImportWalletFromPrivateKey(privateKeyHex, password stri
 	return walletDetails, nil
 }
 
-func (ws *WalletService) LoadWallet(wallet *domain.Wallet, password string) (*WalletDetails, error) {
+func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDetails, error) {
 	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading the wallet file: %v", err)
@@ -214,11 +213,11 @@ func (ws *WalletService) LoadWallet(wallet *domain.Wallet, password string) (*Wa
 	return walletDetails, nil
 }
 
-func (ws *WalletService) GetAllWallets() ([]domain.Wallet, error) {
+func (ws *WalletService) GetAllWallets() ([]Wallet, error) {
 	return ws.Repo.GetAllWallets()
 }
 
-func (ws *WalletService) DeleteWallet(wallet *domain.Wallet) error {
+func (ws *WalletService) DeleteWallet(wallet *Wallet) error {
 	// Remove o arquivo keystore do sistema
 	err := os.Remove(wallet.KeyStorePath)
 	if err != nil && !os.IsNotExist(err) {

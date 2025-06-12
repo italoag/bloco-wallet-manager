@@ -1,7 +1,7 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/constants"
+	"blocowallet/internal/constants"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -44,7 +44,11 @@ func createStyles() Styles {
 			Background(lipgloss.Color("#7D56F4")),
 
 		TopStrip: lipgloss.NewStyle().Margin(1, constants.StyleMargin).Padding(0, constants.StyleMargin),
-		MenuItem: lipgloss.NewStyle().Width(constants.StyleWidth).Margin(0, constants.StyleMargin).Padding(0, constants.StyleMargin),
+		MenuItem: lipgloss.NewStyle().
+			Width(constants.StyleWidth).
+			Margin(0, constants.StyleMargin).
+			Padding(0, constants.StyleMargin).
+			Border(lipgloss.HiddenBorder(), false, false, false, true),
 		MenuSelected: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("99")).
 			Bold(true).

@@ -1,7 +1,7 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/localization"
+	"blocowallet/pkg/localization"
 )
 
 // menuItem representa uma única opção no menu

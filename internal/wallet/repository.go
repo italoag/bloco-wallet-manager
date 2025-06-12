@@ -1,4 +1,4 @@
-package domain
+package wallet
 
 type WalletRepository interface {
 	AddWallet(wallet *Wallet) error

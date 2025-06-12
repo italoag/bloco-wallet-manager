@@ -1,9 +1,9 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/constants"
-	"blocowallet/localization"
-	"blocowallet/usecases"
+	"blocowallet/internal/constants"
+	"blocowallet/internal/wallet"
+	"blocowallet/pkg/localization"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -56,7 +56,7 @@ func buildFontsList(customFontDir string) []*tdf.FontInfo {
 
 type splashMsg struct{}
 
-func NewCLIModel(service *usecases.WalletService) *CLIModel {
+func NewCLIModel(service *wallet.WalletService) *CLIModel {
 	model := &CLIModel{
 		Service:      service,
 		currentView:  constants.SplashView,
@@ -691,7 +691,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				return m, nil
 			}
 
-			var walletDetails *usecases.WalletDetails
+			var walletDetails *wallet.WalletDetails
 			var err error
 
 			// Check if we're coming from private key import or mnemonic import
@@ -1001,7 +1001,7 @@ func (m *CLIModel) updateTableDimensions() {
 // Funções de inicialização
 
 func (m *CLIModel) initCreateWallet() {
-	m.mnemonic, _ = usecases.GenerateMnemonic()
+	m.mnemonic, _ = wallet.GenerateMnemonic()
 	m.passwordInput = textinput.New()
 	m.passwordInput.Placeholder = localization.Labels["enter_password"]
 	m.passwordInput.CharLimit = constants.PasswordCharLimit // Corrigido para PasswordCharLimit

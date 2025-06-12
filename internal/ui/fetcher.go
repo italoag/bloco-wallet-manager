@@ -1,7 +1,7 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/usecases"
+	"blocowallet/internal/wallet"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -12,7 +12,7 @@ type walletCountMsg struct {
 }
 
 // Comando para buscar wallets e retornar a contagem
-func walletCountCmd(service *usecases.WalletService) tea.Cmd {
+func walletCountCmd(service *wallet.WalletService) tea.Cmd {
 	return func() tea.Msg {
 		wallets, err := service.GetAllWallets()
 		if err != nil {

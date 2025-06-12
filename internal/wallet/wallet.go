@@ -1,4 +1,4 @@
-package domain
+package wallet
 
 type Wallet struct {
 	ID           int

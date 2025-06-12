@@ -1,8 +1,8 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/constants"
-	"blocowallet/localization"
+	"blocowallet/internal/constants"
+	"blocowallet/pkg/localization"
 	"bytes"
 	"fmt"
 	"github.com/arsham/figurine/figurine"

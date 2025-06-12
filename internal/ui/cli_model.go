@@ -1,25 +1,24 @@
-package interfaces
+package ui
 
 import (
-	"blocowallet/domain"
-	"blocowallet/usecases"
+	"blocowallet/internal/wallet"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/digitallyserviced/tdfgo/tdf"
 )
 
 type CLIModel struct {
-	Service           *usecases.WalletService
+	Service           *wallet.WalletService
 	currentView       string
 	menuItems         []menuItem
 	selectedMenu      int
 	importWords       []string
 	importStage       int
 	textInputs        []textinput.Model
-	wallets           []domain.Wallet
+	wallets           []wallet.Wallet
 	walletCount       int
-	selectedWallet    *domain.Wallet
-	deletingWallet    *domain.Wallet
+	selectedWallet    *wallet.Wallet
+	deletingWallet    *wallet.Wallet
 	err               error
 	passwordInput     textinput.Model
 	privateKeyInput   textinput.Model
@@ -27,7 +26,7 @@ type CLIModel struct {
 	walletTable       table.Model
 	width             int
 	height            int
-	walletDetails     *usecases.WalletDetails
+	walletDetails     *wallet.WalletDetails
 	styles            Styles
 	fontsList         []string         // Lista de nomes de fontes carregadas do arquivo externo
 	selectedFont      *tdf.TheDrawFont // Fonte selecionada aleatoriamente
