@@ -1,0 +1,234 @@
+package storage
+
+import (
+	"blocowallet/internal/wallet"
+	"blocowallet/pkg/config"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func setupTestConfig(t *testing.T) *config.Config {
+	// Criando um diretório temporário para o teste
+	tempDir, err := os.MkdirTemp("", "wallet_test")
+	require.NoError(t, err)
+
+	// Limpeza após o teste
+	t.Cleanup(func() {
+		err := os.RemoveAll(tempDir)
+		if err != nil {
+			return
+		}
+	})
+
+	// Configuração para teste com SQLite em memória
+	return &config.Config{
+		AppDir:       tempDir,
+		DatabasePath: tempDir + "/test.db",
+		Database: config.DatabaseConfig{
+			Type: "sqlite",
+			DSN:  ":memory:", // SQLite em memória
+		},
+	}
+}
+
+func TestNewWalletRepository(t *testing.T) {
+	cfg := setupTestConfig(t)
+
+	repo, err := NewWalletRepository(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+
+	// Testando a conexão
+	err = repo.Close()
+	require.NoError(t, err)
+}
+
+func TestGORMRepository_AddWallet(t *testing.T) {
+	cfg := setupTestConfig(t)
+
+	repo, err := NewWalletRepository(cfg)
+	require.NoError(t, err)
+	defer func(repo *GORMRepository) {
+		err := repo.Close()
+		if err != nil {
+			t.Errorf("Erro ao fechar o repositório: %v", err)
+		}
+	}(repo)
+
+	// Criando uma carteira para teste
+	testWallet := &wallet.Wallet{
+		Address:      "0x123456",
+		KeyStorePath: "/path/to/keystore",
+		Mnemonic:     "test mnemonic",
+	}
+
+	// Adicionando a carteira
+	err = repo.AddWallet(testWallet)
+	assert.NoError(t, err)
+	assert.NotZero(t, testWallet.ID, "ID da carteira deveria ser definido após a inserção")
+
+	// Verificando se a carteira foi salva recuperando todas as carteiras
+	wallets, err := repo.GetAllWallets()
+	assert.NoError(t, err)
+	assert.Len(t, wallets, 1)
+	assert.Equal(t, testWallet.Address, wallets[0].Address)
+	assert.Equal(t, testWallet.KeyStorePath, wallets[0].KeyStorePath)
+	assert.Equal(t, testWallet.Mnemonic, wallets[0].Mnemonic)
+}
+
+func TestGORMRepository_GetAllWallets(t *testing.T) {
+	cfg := setupTestConfig(t)
+
+	repo, err := NewWalletRepository(cfg)
+	require.NoError(t, err)
+	defer func(repo *GORMRepository) {
+		err := repo.Close()
+		if err != nil {
+			t.Errorf("Erro ao fechar o repositório: %v", err)
+		}
+	}(repo)
+
+	// Inicialmente não deve haver carteiras
+	wallets, err := repo.GetAllWallets()
+	assert.NoError(t, err)
+	assert.Empty(t, wallets)
+
+	// Adicionando algumas carteiras para teste
+	testWallets := []*wallet.Wallet{
+		{
+			Address:      "0x111111",
+			KeyStorePath: "/path/to/keystore1",
+			Mnemonic:     "test mnemonic 1",
+		},
+		{
+			Address:      "0x222222",
+			KeyStorePath: "/path/to/keystore2",
+			Mnemonic:     "test mnemonic 2",
+		},
+	}
+
+	for _, w := range testWallets {
+		err = repo.AddWallet(w)
+		require.NoError(t, err)
+	}
+
+	// Verificando se todas as carteiras foram recuperadas
+	wallets, err = repo.GetAllWallets()
+	assert.NoError(t, err)
+	assert.Len(t, wallets, 2)
+}
+
+func TestGORMRepository_DeleteWallet(t *testing.T) {
+	cfg := setupTestConfig(t)
+
+	repo, err := NewWalletRepository(cfg)
+	require.NoError(t, err)
+	defer func(repo *GORMRepository) {
+		err := repo.Close()
+		if err != nil {
+			t.Errorf("Erro ao fechar o repositório: %v", err)
+		}
+	}(repo)
+
+	// Adicionando uma carteira para teste
+	testWallet := &wallet.Wallet{
+		Address:      "0x123456",
+		KeyStorePath: "/path/to/keystore",
+		Mnemonic:     "test mnemonic",
+	}
+
+	err = repo.AddWallet(testWallet)
+	require.NoError(t, err)
+	require.NotZero(t, testWallet.ID)
+
+	// Deletando a carteira
+	err = repo.DeleteWallet(testWallet.ID)
+	assert.NoError(t, err)
+
+	// Verificando se a carteira foi removida
+	wallets, err := repo.GetAllWallets()
+	assert.NoError(t, err)
+	assert.Empty(t, wallets)
+}
+
+// Teste para verificar o comportamento com diferentes tipos de banco de dados
+func TestGORMRepository_DatabaseTypes(t *testing.T) {
+	testCases := []struct {
+		name    string
+		dbType  string
+		dsn     string
+		wantErr bool
+	}{
+		{
+			name:    "SQLite em memória",
+			dbType:  "sqlite",
+			dsn:     ":memory:",
+			wantErr: false,
+		},
+		{
+			name:    "SQLite em arquivo",
+			dbType:  "sqlite",
+			dsn:     "", // Usar DatabasePath
+			wantErr: false,
+		},
+		{
+			name:    "PostgreSQL sem DSN",
+			dbType:  "postgres",
+			dsn:     "",
+			wantErr: true,
+		},
+		{
+			name:    "MySQL sem DSN",
+			dbType:  "mysql",
+			dsn:     "",
+			wantErr: true,
+		},
+		{
+			name:    "Tipo de banco não suportado",
+			dbType:  "mongodb",
+			dsn:     "mongodb://localhost:27017",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir, err := os.MkdirTemp("", "wallet_test")
+			require.NoError(t, err)
+			defer func(path string) {
+				err := os.RemoveAll(path)
+				if err != nil {
+					t.Errorf("Erro ao remover diretório temporário: %v", err)
+				}
+			}(tempDir)
+
+			cfg := &config.Config{
+				AppDir:       tempDir,
+				DatabasePath: tempDir + "/test.db",
+				Database: config.DatabaseConfig{
+					Type: tc.dbType,
+					DSN:  tc.dsn,
+				},
+			}
+
+			repo, err := NewWalletRepository(cfg)
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, repo)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, repo)
+				// Fechar a conexão se não for nil
+				if repo != nil {
+					err := repo.Close()
+					if err != nil {
+						return
+					}
+				}
+			}
+		})
+	}
+}

@@ -8,6 +8,39 @@ wallets_dir = "~/.wallets/keystore"
 database_path = "~/.wallets/wallets.db"
 locale_dir = "~/.wallets/locale"
 
+# Database Settings
+[database]
+# Configurações de banco de dados
+# Tipos suportados: "sqlite" (padrão), "postgres", "mysql"
+type = "sqlite"
+
+# String de conexão (DSN) para o banco de dados
+# Se vazio, usa database_path para SQLite, caso contrário usa essa string de conexão
+# Para cada tipo de banco de dados, configure a DSN conforme exemplos abaixo:
+#
+# SQLite:
+# - ":memory:" para banco de dados em memória (não persistente)
+# - "/caminho/absoluto/para/arquivo.db" para um arquivo específico
+# - Deixe em branco para usar o valor em database_path
+#
+# PostgreSQL:
+# - "host=localhost user=postgres password=sua_senha dbname=wallets port=5432 sslmode=disable"
+# - "postgresql://usuario:senha@localhost:5432/wallets?sslmode=disable"
+#
+# MySQL:
+# - "usuario:senha@tcp(localhost:3306)/wallets?charset=utf8mb4&parseTime=True&loc=Local"
+# - "usuario:senha@localhost:3306/wallets?charset=utf8mb4&parseTime=True&loc=Local"
+dsn = ""
+
+# Security Settings
+[security]
+# Configurações do algoritmo Argon2id para criptografia de dados sensíveis
+argon2_time = 1         # Número de iterações
+argon2_memory = 65536   # Uso de memória em KB (64MB)
+argon2_threads = 4      # Número de threads
+argon2_key_len = 32     # Tamanho da chave derivada em bytes
+salt_length = 16        # Tamanho do salt em bytes
+
 # Font Settings
 [fonts]
 available = [

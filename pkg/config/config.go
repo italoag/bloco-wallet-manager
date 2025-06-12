@@ -21,6 +21,23 @@ type Config struct {
 	DatabasePath string
 	LocaleDir    string
 	Fonts        []string
+	Database     DatabaseConfig
+	Security     SecurityConfig
+}
+
+// DatabaseConfig holds database-specific configuration
+type DatabaseConfig struct {
+	Type string // sqlite, postgres, mysql
+	DSN  string // Data Source Name (connection string)
+}
+
+// SecurityConfig holds security-specific configuration
+type SecurityConfig struct {
+	Argon2Time    uint32
+	Argon2Memory  uint32
+	Argon2Threads uint8
+	Argon2KeyLen  uint32
+	SaltLength    uint32
 }
 
 // LoadConfig loads the configuration from a TOML file using Viper
@@ -73,6 +90,17 @@ func LoadConfig(appDir string) (*Config, error) {
 		DatabasePath: v.GetString("app.database_path"),
 		LocaleDir:    v.GetString("app.locale_dir"),
 		Fonts:        v.GetStringSlice("fonts.available"),
+		Database: DatabaseConfig{
+			Type: v.GetString("database.type"),
+			DSN:  v.GetString("database.dsn"),
+		},
+		Security: SecurityConfig{
+			Argon2Time:    v.GetUint32("security.argon2_time"),
+			Argon2Memory:  v.GetUint32("security.argon2_memory"),
+			Argon2Threads: uint8(v.GetUint("security.argon2_threads")),
+			Argon2KeyLen:  v.GetUint32("security.argon2_key_len"),
+			SaltLength:    v.GetUint32("security.salt_length"),
+		},
 	}
 
 	// Expand paths with ~ to home directory
@@ -99,8 +127,29 @@ func LoadConfig(appDir string) (*Config, error) {
 		cfg.DatabasePath = expandPath(envDatabasePath, homeDir)
 	}
 
-	if envLocaleDir := os.Getenv("BLOCOWALLET_APP_LOCALE_DIR"); envLocaleDir != "" {
-		cfg.LocaleDir = expandPath(envLocaleDir, homeDir)
+	if envDatabaseType := os.Getenv("BLOCOWALLET_DATABASE_TYPE"); envDatabaseType != "" {
+		cfg.Database.Type = envDatabaseType
+	}
+
+	if envDatabaseDSN := os.Getenv("BLOCOWALLET_DATABASE_DSN"); envDatabaseDSN != "" {
+		cfg.Database.DSN = envDatabaseDSN
+	}
+
+	// Set default values for security if not provided
+	if cfg.Security.Argon2Time == 0 {
+		cfg.Security.Argon2Time = 1
+	}
+	if cfg.Security.Argon2Memory == 0 {
+		cfg.Security.Argon2Memory = 64 * 1024 // 64MB
+	}
+	if cfg.Security.Argon2Threads == 0 {
+		cfg.Security.Argon2Threads = 4
+	}
+	if cfg.Security.Argon2KeyLen == 0 {
+		cfg.Security.Argon2KeyLen = 32
+	}
+	if cfg.Security.SaltLength == 0 {
+		cfg.Security.SaltLength = 16
 	}
 
 	return cfg, nil

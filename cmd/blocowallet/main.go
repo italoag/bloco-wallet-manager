@@ -59,6 +59,9 @@ func main() {
 		handleError("Erro ao carregar os arquivos de localização", err)
 	}
 
+	// Inicializar o serviço de criptografia
+	wallet.InitCryptoService(cfg)
+
 	// Garantir que o diretório de wallets exista
 	if _, err := os.Stat(cfg.WalletsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(cfg.WalletsDir, os.ModePerm)
@@ -67,8 +70,8 @@ func main() {
 		}
 	}
 
-	// Inicializar o repositório
-	repo, err := storage.NewSQLiteRepository(cfg.DatabasePath)
+	// Inicializar o repositório usando GORM com suporte a múltiplos bancos de dados
+	repo, err := storage.NewWalletRepository(cfg)
 	if err != nil {
 		handleError("Erro ao inicializar o banco de dados", err)
 	}
@@ -102,7 +105,7 @@ func closeFile(file *os.File) {
 	}
 }
 
-func closeResource(repo *storage.SQLiteRepository) {
+func closeResource(repo wallet.WalletRepository) {
 	if err := repo.Close(); err != nil {
 		log.Printf("Erro ao fechar o banco de dados: %v\n", err)
 	}
