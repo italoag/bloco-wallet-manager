@@ -20,6 +20,7 @@ type CLIModel struct {
 	selectedWallet    *wallet.Wallet
 	deletingWallet    *wallet.Wallet
 	err               error
+	nameInput         textinput.Model
 	passwordInput     textinput.Model
 	privateKeyInput   textinput.Model
 	mnemonic          string

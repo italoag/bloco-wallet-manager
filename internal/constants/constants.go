@@ -8,6 +8,7 @@ const (
 	PasswordMinLength         = 8
 	DefaultView               = "menu"
 	SplashView                = "splash"
+	CreateWalletNameView      = "create_wallet_name"
 	CreateWalletView          = "create_wallet_password"
 	ImportWalletView          = "import_wallet"
 	ImportWalletPasswordView  = "import_wallet_password"

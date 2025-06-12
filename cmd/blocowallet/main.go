@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -57,6 +59,25 @@ func main() {
 	err = localization.InitLocalization(cfg)
 	if err != nil {
 		handleError("Erro ao carregar os arquivos de localização", err)
+	}
+
+	// Set version from build info
+	if info, ok := debug.ReadBuildInfo(); ok {
+		version := "0.1.0" // Default version if not found
+
+		// Try to find version from build info
+		for _, setting := range info.Settings {
+			if strings.HasPrefix(setting.Key, "vcs.revision") {
+				// Use first 7 characters of commit hash
+				if len(setting.Value) >= 7 {
+					version = "0.2.0" // Use semantic versioning
+					break
+				}
+			}
+		}
+
+		// Set version in localization labels
+		localization.Labels["version"] = version
 	}
 
 	// Inicializar o serviço de criptografia

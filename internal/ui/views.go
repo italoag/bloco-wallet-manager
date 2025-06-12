@@ -15,6 +15,22 @@ import (
 	"time"
 )
 
+// viewCreateWalletName renderiza a visualização de entrada do nome da wallet
+func (m *CLIModel) viewCreateWalletName() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	var view strings.Builder
+	view.WriteString(
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00FF00")).Render("Criar Nova Wallet") + "\n\n" +
+			"Digite o nome para sua nova wallet:" + "\n\n" +
+			m.nameInput.View() + "\n\n" +
+			localization.Labels["press_enter"],
+	)
+	return view.String()
+}
+
 // viewCreateWalletPassword renderiza a visualização de criação de wallet
 func (m *CLIModel) viewCreateWalletPassword() string {
 	if localization.Labels == nil {
@@ -87,13 +103,34 @@ func (m *CLIModel) renderStatusBar() string {
 		SetString(fmt.Sprintf("Date: %s", currentTime)).
 		String()
 
+	// Map view constants to human-readable names
+	viewNames := map[string]string{
+		constants.DefaultView:               localization.Labels["main_menu_title"],
+		constants.SplashView:                "Splash",
+		constants.CreateWalletNameView:      localization.Labels["create_new_wallet"],
+		constants.CreateWalletView:          localization.Labels["create_new_wallet"],
+		constants.ImportWalletView:          localization.Labels["import_wallet"],
+		constants.ImportWalletPasswordView:  localization.Labels["import_wallet"],
+		constants.ImportMethodSelectionView: localization.Labels["import_method_title"],
+		constants.ImportPrivateKeyView:      localization.Labels["import_private_key"],
+		constants.ListWalletsView:           localization.Labels["list_wallets"],
+		constants.WalletPasswordView:        localization.Labels["enter_wallet_password"],
+		constants.WalletDetailsView:         localization.Labels["wallet_details_title"],
+	}
+
+	// Get the view name from the map, or use the current view constant if not found
+	viewName := viewNames[m.currentView]
+	if viewName == "" {
+		viewName = m.currentView
+	}
+
 	// Center part: Current view and shortcut keys
 	var centerContent string
 	if m.currentView == constants.ListWalletsView {
 		// Special case for wallet list view to include delete instruction
-		centerContent = fmt.Sprintf(localization.Labels["wallet_list_status_bar"], localization.Labels[m.currentView])
+		centerContent = fmt.Sprintf("View: %s | Press 'd' to delete | Press 'esc' to return | Press 'q' to quit", viewName)
 	} else {
-		centerContent = fmt.Sprintf(localization.Labels["status_bar_instructions"], localization.Labels[m.currentView])
+		centerContent = fmt.Sprintf("View: %s | Press 'esc' to return | Press 'q' to quit", viewName)
 	}
 
 	centerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)

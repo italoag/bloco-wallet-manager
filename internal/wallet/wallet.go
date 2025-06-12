@@ -1,11 +1,15 @@
 package wallet
 
+import "time"
+
 // Wallet representa uma carteira de criptomoeda
 type Wallet struct {
-	ID           int    `gorm:"primaryKey"`
-	Address      string `gorm:"uniqueIndex;not null"`
-	KeyStorePath string `gorm:"not null"`
-	Mnemonic     string `gorm:"not null"`
+	ID           int       `gorm:"primaryKey"`
+	Name         string    `gorm:"not null"`
+	Address      string    `gorm:"uniqueIndex;not null"`
+	KeyStorePath string    `gorm:"not null"`
+	Mnemonic     string    `gorm:"not null"`
+	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
 }
 
 // TableName define o nome da tabela no banco de dados

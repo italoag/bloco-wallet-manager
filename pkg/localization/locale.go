@@ -171,7 +171,7 @@ func getLanguageName(code string) string {
 // getEnglishMessages returns the default English messages
 func getEnglishMessages() map[string]string {
 	return map[string]string{
-		"welcome_message":            "Welcome to the BLOCO wallet Manager!\n\nSelect an option from the menu.",
+		"welcome_message":            "Welcome to the BLOCO Wallet!\n\nSelect an option from the menu.",
 		"mnemonic_phrase":            "Mnemonic Phrase (Keep it Safe!):",
 		"enter_password":             "Enter a password to encrypt the wallet:",
 		"press_enter":                "Press Enter to continue.",
@@ -219,11 +219,15 @@ func getEnglishMessages() map[string]string {
 		"delete_wallet":              "Delete Wallet",
 		"confirm_title":              "Confirm",
 		"cancel":                     "Cancel",
-		// Adicionando as chaves que estavam faltando no menu
-		"list_wallets":      "My Wallets",
-		"list_wallets_desc": "View and manage your wallets",
-		"exit":              "Exit",
-		"exit_desc":         "Exit the application",
+		"list_wallets":               "My Wallets",
+		"list_wallets_desc":          "View and manage your wallets",
+		"exit":                       "Exit",
+		"exit_desc":                  "Exit the application",
+		"created_at":                 "Created",
+		"wallet_type":                "Type",
+		"imported_private_key":       "Private Key",
+		"imported_mnemonic":          "Mnemonic",
+		"version":                    "0.2.0",
 	}
 }
 
@@ -278,11 +282,15 @@ func getPortugueseMessages() map[string]string {
 		"delete_wallet":              "Excluir Carteira",
 		"confirm_title":              "Confirmar",
 		"cancel":                     "Cancelar",
-		// Adicionando as chaves que estavam faltando no menu
-		"list_wallets":      "Minhas Carteiras",
-		"list_wallets_desc": "Visualizar e gerenciar suas carteiras",
-		"exit":              "Sair",
-		"exit_desc":         "Sair da aplicação",
+		"list_wallets":               "Minhas Carteiras",
+		"list_wallets_desc":          "Visualizar e gerenciar suas carteiras",
+		"exit":                       "Sair",
+		"exit_desc":                  "Sair da aplicação",
+		"created_at":                 "Criado Em",
+		"wallet_type":                "Tipo",
+		"imported_private_key":       "Chave Privada",
+		"imported_mnemonic":          "Frase Mnemônica",
+		"version":                    "0.2.0",
 	}
 }
 
@@ -337,6 +345,15 @@ func getSpanishMessages() map[string]string {
 		"delete_wallet":              "Eliminar Cartera",
 		"confirm_title":              "Confirmar",
 		"cancel":                     "Cancelar",
+		"list_wallets":               "Mis Carteras",
+		"list_wallets_desc":          "Ver y administrar tus carteras",
+		"exit":                       "Salir",
+		"exit_desc":                  "Salir de la aplicación",
+		"created_at":                 "Creado En",
+		"wallet_type":                "Tipo",
+		"imported_private_key":       "Clave Privada",
+		"imported_mnemonic":          "Frase Mnemónica",
+		"version":                    "0.2.0",
 	}
 }
 

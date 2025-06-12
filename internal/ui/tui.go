@@ -302,6 +302,8 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case constants.DefaultView:
 		return m.updateMenu(msg)
+	case constants.CreateWalletNameView:
+		return m.updateCreateWalletName(msg)
 	case constants.CreateWalletView:
 		return m.updateCreateWalletPassword(msg)
 	case constants.ImportMethodSelectionView:
@@ -494,6 +496,8 @@ func (m *CLIModel) getContentView() string {
 	switch m.currentView {
 	case constants.DefaultView:
 		return localization.Labels["welcome_message"]
+	case constants.CreateWalletNameView:
+		return m.viewCreateWalletName()
 	case constants.CreateWalletView:
 		return m.viewCreateWalletPassword()
 	case constants.ImportMethodSelectionView:
@@ -558,6 +562,35 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *CLIModel) updateCreateWalletName(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			name := strings.TrimSpace(m.nameInput.Value())
+			if name == "" {
+				m.err = errors.Wrap(fmt.Errorf("O nome da wallet não pode estar vazio"), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				m.currentView = constants.DefaultView
+				return m, nil
+			}
+			// Proceed to password input
+			m.passwordInput.Focus()
+			m.currentView = constants.CreateWalletView
+			return m, nil
+		case "esc", "backspace":
+			// Reset the name input field and go back to menu
+			m.nameInput = textinput.New()
+			m.currentView = constants.DefaultView
+		default:
+			var cmd tea.Cmd
+			m.nameInput, cmd = m.nameInput.Update(msg)
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
 func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -570,7 +603,8 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
-			walletDetails, err := m.Service.CreateWallet(password)
+			name := strings.TrimSpace(m.nameInput.Value())
+			walletDetails, err := m.Service.CreateWallet(name, password)
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
@@ -583,9 +617,10 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			// Atualizar a contagem de wallets
 			return m, m.refreshWalletsTable()
 		case "esc", "backspace":
-			// Reset the password input field
-			m.passwordInput = textinput.New()
-			m.currentView = constants.DefaultView
+			// Go back to name input
+			m.nameInput.Focus()
+			m.currentView = constants.CreateWalletNameView
+			return m, nil
 		default:
 			var cmd tea.Cmd
 			m.passwordInput, cmd = m.passwordInput.Update(msg)
@@ -648,15 +683,23 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			var walletDetails *wallet.WalletDetails
 			var err error
 
+			// Use a default name based on the import method
+			var name string
+			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
+				name = "Imported Private Key Wallet"
+			} else {
+				name = "Imported Mnemonic Wallet"
+			}
+
 			// Check if we're coming from private key import or mnemonic import
 			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
 				// Import from private key
 				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
-				walletDetails, err = m.Service.ImportWalletFromPrivateKey(privateKey, password)
+				walletDetails, err = m.Service.ImportWalletFromPrivateKey(name, privateKey, password)
 			} else {
 				// Import from mnemonic
 				mnemonic := strings.Join(m.importWords, " ")
-				walletDetails, err = m.Service.ImportWallet(mnemonic, password)
+				walletDetails, err = m.Service.ImportWallet(name, mnemonic, password)
 			}
 
 			if err != nil {
@@ -809,7 +852,7 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Reconstruir linhas da tabela
 						rows := make([]table.Row, len(wallets))
 						for i, w := range wallets {
-							rows[i] = table.Row{fmt.Sprintf("%d", w.ID), w.Address}
+							rows[i] = table.Row{fmt.Sprintf("%d", w.ID), w.Name, w.Address}
 						}
 						m.walletTable.SetRows(rows)
 					}
@@ -836,8 +879,8 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only try to access the table if there are wallets
 			if len(m.wallets) > 0 {
 				selectedRow := m.walletTable.SelectedRow()
-				if len(selectedRow) > 1 {
-					address := selectedRow[1]
+				if len(selectedRow) > 2 {
+					address := selectedRow[2]
 					for i, w := range m.wallets {
 						if w.Address == address {
 							m.deletingWallet = &m.wallets[i]
@@ -850,8 +893,8 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only try to access the table if there are wallets
 			if len(m.wallets) > 0 {
 				selectedRow := m.walletTable.SelectedRow()
-				if len(selectedRow) > 1 {
-					address := selectedRow[1]
+				if len(selectedRow) > 2 {
+					address := selectedRow[2]
 					// Buscar wallet pela address
 					for _, w := range m.wallets {
 						if w.Address == address {
@@ -955,22 +998,30 @@ func (m *CLIModel) updateTableDimensions() {
 	}
 
 	// Definir largura e altura da tabela
-	m.walletTable.SetWidth(m.width - 4)
+	// Reduzir a largura da tabela para evitar quebra de linha
+	m.walletTable.SetWidth(m.width - 12)
 	if len(m.wallets) > 0 {
 		m.walletTable.SetHeight(contentAreaHeight)
 	}
 
 	// Calcular larguras das colunas
 	idColWidth := 10
-	addressColWidth := m.width - idColWidth - 8 // Subtrai 8 para padding e margens
+	nameColWidth := 20
+	typeColWidth := 20
+	createdAtColWidth := 20
+	// Aumentar a margem para evitar quebra de linha
+	addressColWidth := m.width - idColWidth - nameColWidth - typeColWidth - createdAtColWidth - 20
 
 	if addressColWidth < 20 {
 		addressColWidth = 20
 	}
 
-	// Atualizar colunas
+	// Atualizar colunas - manter consistente com initListWallets e rebuildWalletsTable
 	m.walletTable.SetColumns([]table.Column{
 		{Title: localization.Labels["id"], Width: idColWidth},
+		{Title: "Nome", Width: nameColWidth},
+		{Title: localization.Labels["wallet_type"], Width: typeColWidth},
+		{Title: localization.Labels["created_at"], Width: createdAtColWidth},
 		{Title: localization.Labels["ethereum_address"], Width: addressColWidth},
 	})
 }
@@ -979,14 +1030,22 @@ func (m *CLIModel) updateTableDimensions() {
 
 func (m *CLIModel) initCreateWallet() {
 	m.mnemonic, _ = wallet.GenerateMnemonic()
+
+	// Initialize name input first
+	m.nameInput = textinput.New()
+	m.nameInput.Placeholder = "Digite o nome da wallet"
+	m.nameInput.CharLimit = 50
+	m.nameInput.Width = constants.PasswordWidth
+	m.nameInput.Focus()
+	m.currentView = constants.CreateWalletNameView
+
+	// Initialize password input (will be used after name is entered)
 	m.passwordInput = textinput.New()
 	m.passwordInput.Placeholder = localization.Labels["enter_password"]
-	m.passwordInput.CharLimit = constants.PasswordCharLimit // Corrigido para PasswordCharLimit
+	m.passwordInput.CharLimit = constants.PasswordCharLimit
 	m.passwordInput.Width = constants.PasswordWidth
 	m.passwordInput.EchoMode = textinput.EchoPassword
 	m.passwordInput.EchoCharacter = '•'
-	m.passwordInput.Focus()
-	m.currentView = constants.CreateWalletView
 }
 
 func (m *CLIModel) initImportMethodSelection() {
@@ -1024,7 +1083,10 @@ func (m *CLIModel) initListWallets() {
 
 	// Inicialize as colunas com larguras adequadas
 	idColWidth := 10
-	addressColWidth := m.width - idColWidth - 8 // Subtrai 8 para padding e margens
+	nameColWidth := 20
+	typeColWidth := 20
+	createdAtColWidth := 20
+	addressColWidth := m.width - idColWidth - nameColWidth - typeColWidth - createdAtColWidth - 20 // Subtrai 20 para padding e margens
 
 	if addressColWidth < 20 {
 		addressColWidth = 20
@@ -1032,12 +1094,30 @@ func (m *CLIModel) initListWallets() {
 
 	columns := []table.Column{
 		{Title: localization.Labels["id"], Width: idColWidth},
+		{Title: "Nome", Width: nameColWidth},
+		{Title: localization.Labels["wallet_type"], Width: typeColWidth},
+		{Title: localization.Labels["created_at"], Width: createdAtColWidth},
 		{Title: localization.Labels["ethereum_address"], Width: addressColWidth},
 	}
 
 	var rows []table.Row
 	for _, w := range m.wallets {
-		rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
+		// Determine wallet type based on mnemonic presence
+		walletType := localization.Labels["imported_mnemonic"]
+		if w.Mnemonic == "" {
+			walletType = localization.Labels["imported_private_key"]
+		}
+
+		// Format created at date
+		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
+
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", w.ID), 
+			w.Name, 
+			walletType,
+			createdAt,
+			w.Address,
+		})
 	}
 
 	m.walletTable = table.New(
@@ -1045,6 +1125,9 @@ func (m *CLIModel) initListWallets() {
 		table.WithRows(rows),
 		table.WithFocused(true),
 	)
+
+	// Definir largura explicitamente para evitar quebra de linha
+	m.walletTable.SetWidth(m.width - 12)
 
 	// Ajustar os estilos da tabela
 	s := table.DefaultStyles()
@@ -1123,7 +1206,10 @@ func (m *CLIModel) rebuildWalletsTable() {
 
 	// Inicialize as colunas com larguras adequadas
 	idColWidth := 10
-	addressColWidth := m.width - idColWidth - 8 // Subtrai 8 para padding e margens
+	nameColWidth := 20
+	typeColWidth := 20
+	createdAtColWidth := 20
+	addressColWidth := m.width - idColWidth - nameColWidth - typeColWidth - createdAtColWidth - 20 // Subtrai 20 para padding e margens
 
 	if addressColWidth < 20 {
 		addressColWidth = 20
@@ -1131,12 +1217,30 @@ func (m *CLIModel) rebuildWalletsTable() {
 
 	columns := []table.Column{
 		{Title: localization.Labels["id"], Width: idColWidth},
+		{Title: "Nome", Width: nameColWidth},
+		{Title: localization.Labels["wallet_type"], Width: typeColWidth},
+		{Title: localization.Labels["created_at"], Width: createdAtColWidth},
 		{Title: localization.Labels["ethereum_address"], Width: addressColWidth},
 	}
 
 	var rows []table.Row
 	for _, w := range m.wallets {
-		rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
+		// Determine wallet type based on mnemonic presence
+		walletType := localization.Labels["imported_mnemonic"]
+		if w.Mnemonic == "" {
+			walletType = localization.Labels["imported_private_key"]
+		}
+
+		// Format created at date
+		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
+
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", w.ID), 
+			w.Name, 
+			walletType,
+			createdAt,
+			w.Address,
+		})
 	}
 
 	m.walletTable = table.New(
@@ -1144,6 +1248,9 @@ func (m *CLIModel) rebuildWalletsTable() {
 		table.WithRows(rows),
 		table.WithFocused(true),
 	)
+
+	// Definir largura explicitamente para evitar quebra de linha
+	m.walletTable.SetWidth(m.width - 12)
 
 	// Ajustar os estilos da tabela
 	s := table.DefaultStyles()
