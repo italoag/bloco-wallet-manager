@@ -43,7 +43,16 @@ type Model struct {
 	// Configuration
 	config *config.Config
 
-	// Input fields for wallet creation/import
+	// Components
+	splashComponent          SplashComponent
+	mainMenuComponent        MainMenuComponent
+	walletListComponent      WalletListComponent
+	balanceComponent         BalanceComponent
+	createWalletComponent    CreateWalletComponent
+	importMnemonicComponent  ImportMnemonicComponent
+	importPrivateKeyComponent ImportPrivateKeyComponent
+
+	// Legacy input fields (to be removed gradually)
 	nameInput       textinput.Model
 	passwordInput   textinput.Model
 	mnemonicInput   textinput.Model

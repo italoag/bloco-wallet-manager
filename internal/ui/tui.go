@@ -108,6 +108,17 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 		selected:            0,
 		loading:             false,
 		currentView:         SplashView,
+		
+		// Initialize components
+		splashComponent:           NewSplashComponent(),
+		mainMenuComponent:         NewMainMenuComponent(),
+		walletListComponent:       NewWalletListComponent(),
+		balanceComponent:          NewBalanceComponent(),
+		createWalletComponent:     NewCreateWalletComponent(),
+		importMnemonicComponent:   NewImportMnemonicComponent(),
+		importPrivateKeyComponent: NewImportPrivateKeyComponent(),
+		
+		// Legacy fields (to be removed gradually)
 		nameInput:           nameInput,
 		passwordInput:       passwordInput,
 		mnemonicInput:       mnemonicInput,
