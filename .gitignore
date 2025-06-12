@@ -30,6 +30,7 @@ go.work
 go.work.sum
 
 # env file
+.envrc
 .env
 /blocowallet.log
 /wallets.db
