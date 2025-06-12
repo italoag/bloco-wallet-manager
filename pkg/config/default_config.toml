@@ -1,0 +1,24 @@
+# BlocoWallet Configuration
+
+# Application Settings
+[app]
+language = "en"
+app_dir = "~/.wallets"
+wallets_dir = "~/.wallets/keystore"
+database_path = "~/.wallets/wallets.db"
+locale_dir = "~/.wallets/locale"
+
+# Font Settings
+[fonts]
+available = [
+  "1911",
+  "dynasty",
+  "etherx",
+  "commx",
+  "intensex",
+  "icex",
+  "royfour",
+  "phudge",
+  "portal",
+  "wild"
+]
