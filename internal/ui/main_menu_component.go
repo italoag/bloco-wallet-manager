@@ -78,6 +78,18 @@ func NewMainMenuComponent() MainMenuComponent {
 	keys := newMenuKeyMap()
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
 	menuList := list.New(items, delegate, 0, 0)
 	menuList.Title = "🏦 BlockoWallet - Main Menu"
 	menuList.Styles.Title = titleStyle

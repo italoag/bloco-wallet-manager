@@ -4,26 +4,31 @@ import "github.com/charmbracelet/lipgloss"
 
 // Style definitions for consistent UI appearance
 var (
+	// Menu item colors
+	menuItemForeground = lipgloss.Color("#874BFD")
+	menuItemBackground = lipgloss.Color("#FFFFFF")
+
 	// Header styles
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#874BFD")).
+			Foreground(menuItemForeground).
 			MarginBottom(2)
 
-	// Menu and selection styles
+		// Menu and selection styles
 	SelectedStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#874BFD")).
-			Foreground(lipgloss.Color("232")).
+			Background(menuItemBackground).
+			Foreground(menuItemForeground).
 			Padding(0, 1)
 
 	MenuSelectedStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("#874BFD")).
-				Background(lipgloss.Color("235"))
+				Foreground(menuItemForeground).
+				Background(menuItemBackground)
 
-	// Item styles for lists
+		// Item styles for lists
 	ItemStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("250"))
+			Foreground(menuItemForeground).
+			Background(menuItemBackground)
 
 	// Text styles
 	InfoStyle = lipgloss.NewStyle().

@@ -61,6 +61,18 @@ func NewSettingsMenuComponent() SettingsMenuComponent {
 	keys := newSettingsKeyMap()
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
+		Foreground(menuItemForeground).
+		Background(menuItemBackground)
 	settingsList := list.New(items, delegate, 0, 0)
 	settingsList.Title = "⚙️  Settings"
 	settingsList.Styles.Title = titleStyle
