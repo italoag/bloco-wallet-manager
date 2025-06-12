@@ -55,8 +55,8 @@ var (
 	appStyle = lipgloss.NewStyle().Padding(1, 2)
 
 	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFDF5")).
-			Background(lipgloss.Color("#25A065")).
+			Foreground(lipgloss.Color("#874BFD")).
+			Background(lipgloss.Color("#FFFFFF")).
 			Padding(0, 1)
 
 	statusMessageStyle = lipgloss.NewStyle().

@@ -7,18 +7,18 @@ var (
 	// Header styles
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86")).
+			Foreground(lipgloss.Color("#874BFD")).
 			MarginBottom(2)
 
 	// Menu and selection styles
 	SelectedStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("86")).
+			Background(lipgloss.Color("#874BFD")).
 			Foreground(lipgloss.Color("232")).
 			Padding(0, 1)
 
 	MenuSelectedStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("86")).
+				Foreground(lipgloss.Color("#874BFD")).
 				Background(lipgloss.Color("235"))
 
 	// Item styles for lists
@@ -42,7 +42,7 @@ var (
 	// Splash screen styles
 	LogoStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86")).
+			Foreground(lipgloss.Color("#874BFD")).
 			Align(lipgloss.Center)
 
 	SubtitleStyle = lipgloss.NewStyle().
@@ -50,7 +50,7 @@ var (
 			Align(lipgloss.Center)
 
 	InstructionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("86")).
+				Foreground(lipgloss.Color("#874BFD")).
 				Align(lipgloss.Center)
 
 	ProjectInfoStyle = lipgloss.NewStyle().
@@ -60,7 +60,7 @@ var (
 	// Balance styles
 	BalanceStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86"))
+			Foreground(lipgloss.Color("#874BFD"))
 
 	NetworkStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
@@ -101,18 +101,18 @@ var (
 
 	// Input styles
 	InputStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("250")).
+			Foreground(lipgloss.Color("#874BFD")).
 			Background(lipgloss.Color("235")).
 			Padding(0, 1).
 			Margin(1, 0)
 
 	FocusedInputStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("86")).
+				Foreground(lipgloss.Color("#874BFD")).
 				Background(lipgloss.Color("235")).
 				Padding(0, 1).
 				Margin(1, 0).
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("86"))
+				BorderForeground(lipgloss.Color("#874BFD"))
 
 	// Suggestion styles
 	SuggestionStyle = lipgloss.NewStyle().
@@ -122,7 +122,7 @@ var (
 			Margin(0, 1)
 
 	SelectedSuggestionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("86")).
+				Foreground(lipgloss.Color("#874BFD")).
 				Background(lipgloss.Color("240")).
 				Padding(0, 1).
 				Margin(0, 1).
@@ -137,7 +137,7 @@ var (
 
 	// Network configuration styles
 	LabelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
+			Foreground(lipgloss.Color("#874BFD")).
 			Bold(true)
 
 	ValueStyle = lipgloss.NewStyle().

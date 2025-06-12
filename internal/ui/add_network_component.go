@@ -178,12 +178,9 @@ func (c *AddNetworkComponent) searchNetworks(query string) tea.Cmd {
 		if query == "" {
 			popular := []blockchain.NetworkSuggestion{
 				{ChainID: 137, Name: "Polygon Mainnet", Symbol: "POL"},
-				{ChainID: 56, Name: "Binance Smart Chain Mainnet", Symbol: "BNB"},
-				{ChainID: 43114, Name: "Avalanche C-Chain", Symbol: "AVAX"},
 				{ChainID: 42161, Name: "Arbitrum One", Symbol: "ETH"},
 				{ChainID: 10, Name: "Optimism", Symbol: "ETH"},
 				{ChainID: 8453, Name: "Base", Symbol: "ETH"},
-				{ChainID: 59144, Name: "Linea", Symbol: "ETH"},
 			}
 			return networkSuggestionsMsg(popular)
 		}
@@ -449,7 +446,9 @@ func (c *AddNetworkComponent) View() string {
 	// Header
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
+		Foreground(lipgloss.Color("#FFF")).
+		Background(lipgloss.Color("#874BFD")).
+		MarginLeft(2).
 		MarginBottom(1)
 	b.WriteString(headerStyle.Render("🌐 Add Custom Network"))
 	b.WriteString("\n\n")
@@ -457,11 +456,12 @@ func (c *AddNetworkComponent) View() string {
 	// Styles (InfoStyle, ErrorStyle, LoadingStyle are from styles.go)
 	fieldStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("250")).
+		MarginLeft(2).
 		MarginBottom(1)
 
 	labelStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86"))
+		Foreground(lipgloss.Color("#874BFD"))
 
 	searchLabelStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -482,8 +482,14 @@ func (c *AddNetworkComponent) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(labelStyle.Render("Network Details:"))
-	b.WriteString("\n")
+	detailHeaderStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFF")).
+		Background(lipgloss.Color("#874BFD")).
+		MarginLeft(2).
+		MarginBottom(1)
+	b.WriteString(detailHeaderStyle.Render("Network Details:"))
+	b.WriteString("\n\n")
 
 	// Network Name field
 	b.WriteString(labelStyle.Render("Network Name:"))
