@@ -1,87 +1,114 @@
 package config
 
 import (
-	"gopkg.in/yaml.v2"
+	"embed"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/spf13/viper"
 )
 
+//go:embed default_config.toml
+var defaultConfig embed.FS
+
+// Config holds all application configuration
 type Config struct {
-	AppDir       string `yaml:"app_dir"`
-	Language     string `yaml:"language"`
-	WalletsDir   string `yaml:"wallets_dir"`
-	DatabasePath string `yaml:"database_path"`
-	LocaleDir    string `yaml:"locale_dir"`
+	AppDir       string
+	Language     string
+	WalletsDir   string
+	DatabasePath string
+	LocaleDir    string
+	Fonts        []string
 }
 
+// LoadConfig loads the configuration from a TOML file using Viper
+// It also supports environment variables with the prefix BLOCOWALLET_
 func LoadConfig(appDir string) (*Config, error) {
-	configPath := filepath.Join(appDir, "config.yaml")
+	v := viper.New()
 
-	// If a config file doesn't exist, create it with default values
+	// Set default configuration file path
+	configPath := filepath.Join(appDir, "config.toml")
+
+	// Configure Viper
+	v.SetConfigName("config")
+	v.SetConfigType("toml")
+	v.AddConfigPath(appDir)
+
+	// Set up environment variables support
+	v.SetEnvPrefix("BLOCOWALLET")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		defaultConfig := &Config{
-			AppDir:       appDir,
-			Language:     "en",
-			WalletsDir:   filepath.Join(appDir, "keystore"),
-			DatabasePath: filepath.Join(appDir, "wallets.db"),
-			LocaleDir:    filepath.Join(appDir, "locale"),
+		// Create config directory if it doesn't exist
+		if err := os.MkdirAll(appDir, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("failed to create config directory: %w", err)
 		}
 
-		configData, err := yaml.Marshal(defaultConfig)
+		// Read default config
+		defaultConfigData, err := defaultConfig.ReadFile("default_config.toml")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read default config: %w", err)
 		}
 
-		err = os.WriteFile(configPath, configData, 0644)
-		if err != nil {
-			return nil, err
+		// Write default config to file
+		if err := os.WriteFile(configPath, defaultConfigData, 0644); err != nil {
+			return nil, fmt.Errorf("failed to write default config: %w", err)
 		}
 	}
 
-	// Load the configuration file
-	configFile, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-	defer func(configFile *os.File) {
-		err := configFile.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(configFile)
-
-	cfg := &Config{}
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(cfg)
-	if err != nil {
-		return nil, err
+	// Read the config file
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Expand ~ to the home directory
+	// Create config struct
+	cfg := &Config{
+		AppDir:       v.GetString("app.app_dir"),
+		Language:     v.GetString("app.language"),
+		WalletsDir:   v.GetString("app.wallets_dir"),
+		DatabasePath: v.GetString("app.database_path"),
+		LocaleDir:    v.GetString("app.locale_dir"),
+		Fonts:        v.GetStringSlice("fonts.available"),
+	}
+
+	// Expand paths with ~ to home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	if cfg.WalletsDir != "" {
-		cfg.WalletsDir = expandPath(cfg.WalletsDir, homeDir)
-	} else {
-		cfg.WalletsDir = filepath.Join(appDir, "keystore")
+	cfg.AppDir = expandPath(cfg.AppDir, homeDir)
+	cfg.WalletsDir = expandPath(cfg.WalletsDir, homeDir)
+	cfg.DatabasePath = expandPath(cfg.DatabasePath, homeDir)
+	cfg.LocaleDir = expandPath(cfg.LocaleDir, homeDir)
+
+	// Override with environment variables if they exist
+	if envAppDir := os.Getenv("BLOCOWALLET_APP_APP_DIR"); envAppDir != "" {
+		cfg.AppDir = expandPath(envAppDir, homeDir)
 	}
 
-	if cfg.DatabasePath != "" {
-		cfg.DatabasePath = expandPath(cfg.DatabasePath, homeDir)
-	} else {
-		cfg.DatabasePath = filepath.Join(appDir, "wallets.db")
+	if envWalletsDir := os.Getenv("BLOCOWALLET_APP_WALLETS_DIR"); envWalletsDir != "" {
+		cfg.WalletsDir = expandPath(envWalletsDir, homeDir)
 	}
 
-	if cfg.LocaleDir != "" {
-		cfg.LocaleDir = expandPath(cfg.LocaleDir, homeDir)
-	} else {
-		cfg.LocaleDir = filepath.Join(appDir, "locale")
+	if envDatabasePath := os.Getenv("BLOCOWALLET_APP_DATABASE_PATH"); envDatabasePath != "" {
+		cfg.DatabasePath = expandPath(envDatabasePath, homeDir)
+	}
+
+	if envLocaleDir := os.Getenv("BLOCOWALLET_APP_LOCALE_DIR"); envLocaleDir != "" {
+		cfg.LocaleDir = expandPath(envLocaleDir, homeDir)
 	}
 
 	return cfg, nil
+}
+
+// GetFontsList returns the list of available fonts
+func (c *Config) GetFontsList() []string {
+	return c.Fonts
 }
 
 func expandPath(path, homeDir string) string {

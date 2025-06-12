@@ -54,7 +54,7 @@ func main() {
 	}
 
 	// Inicializar a localização
-	err = localization.SetLanguage(cfg.Language, appDir)
+	err = localization.InitLocalization(cfg)
 	if err != nil {
 		handleError("Erro ao carregar os arquivos de localização", err)
 	}

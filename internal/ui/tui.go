@@ -3,9 +3,9 @@ package ui
 import (
 	"blocowallet/internal/constants"
 	"blocowallet/internal/wallet"
+	"blocowallet/pkg/config"
 	"blocowallet/pkg/localization"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/bubbles/table"
@@ -179,65 +179,19 @@ func loadSelectedFont(model *CLIModel, fontInfo *tdf.FontInfo) error {
 	return nil
 }
 
-type FontsConfig struct {
-	Fonts []string `json:"fonts"`
-}
-
+// loadFontsList returns the list of available fonts from the configuration
 func loadFontsList(appDir string) ([]string, error) {
-	// Construir o caminho correto para o arquivo de configuração
-	configPath := filepath.Join(appDir, "config", "fonts.json")
+	// The fonts are now loaded from the main configuration
+	// This function is kept for compatibility, but it's now a simple wrapper
+	// that returns the fonts from the global configuration
 
-	// Verificar se o diretório config existe, se não, criar
-	configDir := filepath.Dir(configPath)
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		err := os.MkdirAll(configDir, os.ModePerm)
-		if err != nil {
-			return nil, fmt.Errorf("erro ao criar o diretório de configuração: %v", err)
-		}
-	}
-
-	// Verificar se o arquivo de configuração existe, se não, criar com valores padrão
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Tentar ler do caminho relativo (para o caso de desenvolvimento)
-		relativeConfigPath := filepath.Join("config", "fonts.json")
-		data, err := os.ReadFile(relativeConfigPath)
-		if err == nil {
-			// Escrever para o caminho correto
-			err = os.WriteFile(configPath, data, 0644)
-			if err != nil {
-				return nil, fmt.Errorf("erro ao criar o arquivo de configuração das fontes: %v", err)
-			}
-		} else {
-			// Se não conseguir ler do relativo, criar um config padrão
-			defaultFonts := FontsConfig{
-				Fonts: []string{
-					"1911", "dynasty", "etherx", "commx", "intensex",
-					"icex", "royfour", "phudge", "portal", "wild",
-				},
-			}
-			data, err := json.Marshal(defaultFonts)
-			if err != nil {
-				return nil, fmt.Errorf("erro ao criar configuração padrão: %v", err)
-			}
-			err = os.WriteFile(configPath, data, 0644)
-			if err != nil {
-				return nil, fmt.Errorf("erro ao criar o arquivo de configuração das fontes: %v", err)
-			}
-		}
-	}
-
-	// Agora ler o arquivo
-	data, err := os.ReadFile(configPath)
+	// Get the fonts from the global configuration
+	cfg, err := config.LoadConfig(appDir)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao ler o arquivo de configuração das fontes: %v", err)
+		return nil, fmt.Errorf("erro ao carregar a configuração: %v", err)
 	}
 
-	var config FontsConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("erro ao deserializar o JSON de fontes: %v", err)
-	}
-
-	return config.Fonts, nil
+	return cfg.GetFontsList(), nil
 }
 
 func selectRandomFont(fonts []string) (string, error) {

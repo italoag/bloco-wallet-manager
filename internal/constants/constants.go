@@ -18,7 +18,6 @@ const (
 	WalletDetailsView         = "wallet_details"
 	StyleWidth                = 40
 	StyleMargin               = 1
-	ConfigFontsPath           = "config/fonts.json"
 	SplashDuration            = 2 * time.Second
 	ErrorFontNotFoundMessage  = "Fonte não encontrada nos diretórios especificados."
 	MnemonicWordCount         = 12
