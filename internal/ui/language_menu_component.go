@@ -61,17 +61,13 @@ func NewLanguageMenuComponent(cfg *config.Config) LanguageMenuComponent {
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.
-		Foreground(menuItemForeground).
-		Background(menuItemBackground)
+		Foreground(menuItemForeground)
 	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.
-		Foreground(menuItemForeground).
-		Background(menuItemBackground)
+		Foreground(menuItemDescriptionForeground)
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
-		Foreground(menuItemForeground).
-		Background(menuItemBackground)
+		Foreground(menuItemForeground)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
-		Foreground(menuItemForeground).
-		Background(menuItemBackground)
+		Foreground(menuItemDescriptionForeground)
 
 	languageList := list.New([]list.Item{}, delegate, 0, 0)
 	languageList.Title = "🌍 Language Selection"
