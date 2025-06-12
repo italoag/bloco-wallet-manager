@@ -81,7 +81,7 @@ func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
 
-	networkList := list.New([]list.Item{}, delegate, 0, 0)
+	networkList := list.New([]list.Item{}, delegate, 80, 20)
 	networkList.Title = "🌐 Network Configuration"
 	networkList.Styles.Title = titleStyle
 	networkList.SetShowStatusBar(false)
@@ -109,12 +109,8 @@ func (c *NetworkListComponent) RefreshNetworks() {
 			if network.IsActive {
 				status = " ✓ Active"
 			}
-			customTag := ""
-			if network.IsCustom {
-				customTag = " [Custom]"
-			}
 
-			title := fmt.Sprintf("%s%s%s", network.Name, status, customTag)
+			title := fmt.Sprintf("%s%s", network.Name, status)
 			description := fmt.Sprintf("Chain ID: %d • %s", network.ChainID, network.RPCEndpoint)
 
 			items = append(items, networkItem{
@@ -130,8 +126,8 @@ func (c *NetworkListComponent) RefreshNetworks() {
 	// Add special items
 	items = append(items, networkItem{
 		id:          "network_add",
-		title:       "➕ Add Custom Network",
-		description: "Add a new custom network configuration",
+		title:       "➕ Add Network",
+		description: "Add a new network configuration",
 		key:         "add-network",
 	})
 
@@ -143,6 +139,10 @@ func (c *NetworkListComponent) RefreshNetworks() {
 	})
 
 	c.list.SetItems(items)
+	// Force a refresh of the list view to ensure it displays correctly
+	if len(items) > 0 {
+		c.list.Select(0)
+	}
 }
 
 // SetSize updates the component size
@@ -197,6 +197,10 @@ func (c *NetworkListComponent) Update(msg tea.Msg) (*NetworkListComponent, tea.C
 	case tea.KeyMsg:
 		// Handle number shortcuts for quick navigation
 		switch msg.String() {
+		case "a":
+			if item, ok := c.list.SelectedItem().(networkItem); ok && item.key != "add-network" && item.key != "back-to-settings" {
+				return c, func() tea.Msg { return NetworkToggleMsg{Key: item.key} }
+			}
 		case "enter":
 			if item, ok := c.list.SelectedItem().(networkItem); ok {
 				return c, func() tea.Msg { return NetworkSelectedMsg{Key: item.key, Network: item.network} }

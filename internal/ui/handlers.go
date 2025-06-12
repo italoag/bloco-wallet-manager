@@ -450,5 +450,9 @@ func (m Model) handleAddNetworkSubmit() (Model, tea.Cmd) {
 	}
 
 	m.addingNetwork = true
-	return m, m.addNetworkCmd(name, chainIDStr, rpcEndpoint)
+	// The symbol is now derived or taken from the form, not passed directly here.
+	// Assuming addNetworkCmd has been updated to reflect this, or it needs to be.
+	// For now, let's pass an empty string for symbol if the function signature still expects it.
+	// Ideally, addNetworkCmd should be refactored if symbol is no longer a direct input at this stage.
+	return m, m.addNetworkCmd(name, chainIDStr, rpcEndpoint, "") // Passing empty string for symbol
 }

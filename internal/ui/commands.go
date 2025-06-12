@@ -114,7 +114,7 @@ func (m Model) importWalletFromPrivateKeyCmd(name, password, privateKey string) 
 type networkErrorMsg string
 
 // addNetworkCmd adds a custom network using ChainList API with retry
-func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
+func (m Model) addNetworkCmd(name, chainIDStr, symbol, rpcEndpoint string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		// Parse chain ID
 		var chainID int
@@ -135,12 +135,18 @@ func (m Model) addNetworkCmd(name, chainIDStr, rpcEndpoint string) tea.Cmd {
 			finalRPC = workingRPC
 		}
 
+		// Use the user-provided symbol or fallback to chainInfo if empty
+		finalSymbol := symbol
+		if finalSymbol == "" && chainInfo != nil {
+			finalSymbol = chainInfo.NativeCurrency.Symbol
+		}
+
 		// Create network configuration
 		network := config.Network{
 			Name:        name,
 			RPCEndpoint: finalRPC,
 			ChainID:     int64(chainInfo.ChainID),
-			Symbol:      chainInfo.NativeCurrency.Symbol,
+			Symbol:      finalSymbol,
 			Explorer:    "",
 			IsActive:    false,
 			IsCustom:    true,

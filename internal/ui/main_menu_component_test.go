@@ -126,7 +126,7 @@ func TestMainMenuComponent_NumberShortcuts(t *testing.T) {
 func TestMainMenuComponent_View(t *testing.T) {
 	// Initialize bubblezone for the test
 	zone.NewGlobal()
-	
+
 	component := NewMainMenuComponent()
 	component.SetSize(80, 24)
 

@@ -1,30 +1,40 @@
 <!--suppress HtmlDeprecatedAttribute -->
-
-<h1 align="center">🔐 BLOCO | Wallet Manager</h1>
+<h1 align="center">🔐 BLOCO Wallet</h1>
 
 <p align="center">
-<a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
-<img src="https://img.shields.io/github/v/release/italoag/bloco-wallet-manager?style=flat-square" alt="Latest Release">
+<a href="https://github.com/italoag/bloco-wallet/releases" style="text-decoration: none">
+<img src="https://img.shields.io/github/v/release/italoag/bloco-wallet?style=flat-square" alt="Latest Release">
 </a>
-<a href="https://github.com/italoag/bloco-wallet-manager/stargazers" style="text-decoration: none">
-<img src="https://img.shields.io/github/stars/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Stars">
+
+<a href="https://github.com/italoag/bloco-wallet/stargazers" style="text-decoration: none">
+<img src="https://img.shields.io/github/stars/italoag/bloco-wallet.svg?style=flat-square" alt="Stars">
 </a>
-<a href="https://github.com/italoag/bloco-wallet-manager/fork" style="text-decoration: none">
-<img src="https://img.shields.io/github/forks/italoag/bloco-wallet-manager.svg?style=flat-square" alt="Forks">
+
+<a href="https://github.com/italoag/bloco-wallet/fork" style="text-decoration: none">
+<img src="https://img.shields.io/github/forks/italoag/bloco-wallet.svg?style=flat-square" alt="Forks">
 </a>
+
 <a href="https://opensource.org/licenses/MIT" style="text-decoration: none">
 <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
 </a>
+
+
+
 <br/>
-<a href="https://github.com/italoag/bloco-wallet-manager/releases" style="text-decoration: none">
+
+<a href="https://github.com/italoag/bloco-wallet/releases" style="text-decoration: none">
 <img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-informational?style=for-the-badge" alt="Downloads">
 </a>
+
  <a href="https://twitter.com/0xitalo">
         <img src="https://img.shields.io/badge/Twitter-%400xitalo-1DA1F2?logo=twitter&style=for-the-badge" alt=""/>
     </a>
+
+<br/>
 <br/>
 
 ### Table of Contents
+- [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
 - [Features](#features)
 - [Installation](#installation)
@@ -34,7 +44,7 @@
 - [License](#license)
 
 ### Introduction
-**BLOCO Wallet Manager** is a command-line interface (CLI) application designed to manage cryptocurrency wallets compatible with the Ethereum network and adhering to the KeyStoreV3 standard. Developed in GoLang, BLOCO provides a Terminal User Interface (TUI) for seamless wallet management. Future integrations will include external vaults such as Hashicorp Vault, Amazon KMS, Cloud HSM, and Azure Key Vault.
+**BLOCO Wallet** is a command-line interface (CLI) application designed to manage cryptocurrency wallets compatible with the Ethereum network and adhering to the KeyStoreV3 standard. Developed in GoLang, BLOCO provides a Terminal User Interface (TUI) for seamless wallet management. Future integrations will include external vaults such as Hashicorp Vault, Amazon KMS, Cloud HSM, and Azure Key Vault.
 
 ### Features
 - **Wallet Management**
@@ -65,22 +75,22 @@
 Ensure you have [Go](https://golang.org/doc/install) installed on your system.
 
 ```bash
-git clone https://github.com/italoag/go-wallet-manager.git
-cd go-wallet-manager
-go build -o blocowm
+git clone https://github.com/italoag/bloco-wallet.git
+cd bloco-wallet
+go build -o build/bloco-wallet
 ```
 
 Move the executable to a directory in your PATH for easy access:
 
 ```bash
-mv blocowm /usr/local/bin/
+mv bloco-wallet /usr/local/bin/
 ```
 
 ### Usage
-Run the BLOCO Wallet Manager using the terminal:
+Run the BLOCO Wallet using the terminal:
 
 ```bash
-blocowm
+bloco-wallet
 ```
 
 Navigate through the TUI to manage your wallets. Available commands include:
@@ -126,7 +136,6 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes with clear messages.
 4. Submit a pull request detailing your changes.
 
-For more information, refer to the [CONTRIBUTING](CONTRIBUTING.md) file.
 
 ### License
 This project is licensed under the [MIT License](LICENSE).

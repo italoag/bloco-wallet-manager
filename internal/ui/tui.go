@@ -85,14 +85,11 @@ func NewModel(walletService *wallet.Service, cfg *config.Config) Model {
 			if network.IsActive {
 				status = " (Active)"
 			}
-			customTag := ""
-			if network.IsCustom {
-				customTag = " [Custom]"
-			}
-			networkItems = append(networkItems, fmt.Sprintf("%s%s%s", network.Name, status, customTag))
+			// Corrected Sprintf call to only include existing arguments
+			networkItems = append(networkItems, fmt.Sprintf("%s%s", network.Name, status))
 		}
 	}
-	networkItems = append(networkItems, "Add Custom Network", "Back to Settings")
+	networkItems = append(networkItems, "Add Network", "Back to Settings")
 
 	var languageItems []string
 	langCodes := cfg.GetLanguageCodes()
@@ -336,6 +333,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case BackToNetworkListMsg:
 		m.currentView = NetworkConfigView
+		m.networkListComponent.SetSize(m.width, m.height)
 		m.networkListComponent.RefreshNetworks()
 		return m, nil
 
@@ -485,26 +483,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case networkAddedMsg:
 		// Add the custom network to config
-		network, ok := msg.network.(config.Network)
-		if !ok {
-			m.err = fmt.Errorf("invalid network type")
-			return m, nil
-		}
-		m.config.AddCustomNetwork(msg.key, network)
+		// The type assertion is no longer needed as msg.network is already config.Network
+		m.config.AddCustomNetwork(msg.key, msg.network)
 		if err := m.config.Save(); err != nil {
 			m.err = err
-		} else {
-			// Refresh network items and go back to network config
-			m.refreshNetworkItems()
-			m.currentView = NetworkConfigView
-			m.networkSelected = 0
-			m.addingNetwork = false
-			// Reset inputs
-			m.networkNameInput.SetValue("")
-			m.chainIDInput.SetValue("")
-			m.rpcEndpointInput.SetValue("")
-			m.addNetworkFocus = 0
+			return m, nil
 		}
+		m.currentView = NetworkConfigView
+		m.networkListComponent = NewNetworkListComponent(m.config)
+		m.networkListComponent.SetSize(m.width, m.height)
+		m.networkListComponent.RefreshNetworks()
 		return m, nil
 
 	case networkErrorMsg:
@@ -908,7 +896,7 @@ func (m Model) handleImportPrivateKeyRequest(msg ImportPrivateKeyRequestMsg) (te
 // handleAddNetworkRequest handles add network requests
 func (m Model) handleAddNetworkRequest(msg AddNetworkRequestMsg) (tea.Model, tea.Cmd) {
 	m.addNetworkComponent.SetAdding(true)
-	return m, m.addNetworkCmd(msg.Name, msg.ChainID, msg.RPCEndpoint)
+	return m, m.addNetworkCmd(msg.Name, msg.ChainID, msg.Symbol, msg.RPCEndpoint)
 }
 
 // handleNetworkToggle handles network toggle requests

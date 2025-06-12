@@ -130,3 +130,12 @@ type chainInfoLoadedMsg struct {
 	chainInfo *blockchain.ChainInfo
 	rpcURL    string
 }
+
+// Message to navigate back to the network list
+type BackToNetworkListMsg struct{}
+
+// Message to indicate a network was added
+type networkAddedMsg struct {
+	network config.Network // Corrected type to config.Network
+	key     string
+}
