@@ -80,6 +80,14 @@ func NewNetworkListComponent(cfg *config.Config) NetworkListComponent {
 	keys := newNetworkKeyMap()
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.
+		Foreground(menuItemForeground)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.
+		Foreground(menuItemDescriptionForeground)
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(menuItemForeground)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
+		Foreground(menuItemDescriptionForeground)
 
 	networkList := list.New([]list.Item{}, delegate, 80, 20)
 	networkList.Title = "🌐 Network Configuration"

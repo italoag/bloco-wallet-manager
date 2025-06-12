@@ -55,13 +55,9 @@ var (
 	appStyle = lipgloss.NewStyle().Padding(1, 2)
 
 	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#874BFD")).
+			Foreground(lipgloss.Color("63")).
 			Background(lipgloss.Color("#FFFFFF")).
 			Padding(0, 1)
-
-	statusMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "#04B575", Dark: "#04B575"}).
-				Render
 )
 
 // NewMainMenuComponent creates a new main menu component
@@ -71,15 +67,23 @@ func NewMainMenuComponent() MainMenuComponent {
 		menuItem{id: "menu_create_wallet", title: "➕ Create New Wallet", description: "Create a new wallet with a generated mnemonic", index: 1},
 		menuItem{id: "menu_import_mnemonic", title: "📥 Import Wallet from Mnemonic", description: "Import an existing wallet using mnemonic phrase", index: 2},
 		menuItem{id: "menu_import_private_key", title: "🔑 Import Wallet from Private Key", description: "Import an existing wallet using private key", index: 3},
-		menuItem{id: "menu_settings", title: "⚙️  Settings", description: "Configure networks and preferences", index: 4},
+		menuItem{id: "menu_settings", title: "⚙️ Settings", description: "Configure networks and preferences", index: 4},
 		menuItem{id: "menu_exit", title: "❌ Exit", description: "Exit the application", index: 5},
 	}
 
 	keys := newMenuKeyMap()
 	// Use default delegate instead of custom delegate to avoid conflicts
 	delegate := list.NewDefaultDelegate()
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.
+		Foreground(menuItemForeground)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.
+		Foreground(menuItemDescriptionForeground)
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(menuItemForeground).Bold(true)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
+		Foreground(menuItemDescriptionForeground)
 	menuList := list.New(items, delegate, 0, 0)
-	menuList.Title = "🏦 BlockoWallet - Main Menu"
+	menuList.Title = "Main Menu"
 	menuList.Styles.Title = titleStyle
 	menuList.SetShowStatusBar(false)
 	menuList.SetFilteringEnabled(false)
