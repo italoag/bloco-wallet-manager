@@ -437,7 +437,7 @@ func (m *CLIModel) renderListWalletsWithLayout() string {
 		titleAndInstructionsHeight := 4
 		tableHeight := contentHeight - titleAndInstructionsHeight
 
-		if tableHeight > 0 {
+		if tableHeight > 0 && len(m.wallets) > 0 {
 			m.walletTable.SetHeight(tableHeight)
 		}
 	}
@@ -879,26 +879,32 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "d", "delete":
-			selectedRow := m.walletTable.SelectedRow()
-			if len(selectedRow) > 1 {
-				address := selectedRow[1]
-				for i, w := range m.wallets {
-					if w.Address == address {
-						m.deletingWallet = &m.wallets[i]
-						return m, nil
+			// Only try to access the table if there are wallets
+			if len(m.wallets) > 0 {
+				selectedRow := m.walletTable.SelectedRow()
+				if len(selectedRow) > 1 {
+					address := selectedRow[1]
+					for i, w := range m.wallets {
+						if w.Address == address {
+							m.deletingWallet = &m.wallets[i]
+							return m, nil
+						}
 					}
 				}
 			}
 		case "enter":
-			selectedRow := m.walletTable.SelectedRow()
-			if len(selectedRow) > 1 {
-				address := selectedRow[1]
-				// Buscar wallet pela address
-				for _, w := range m.wallets {
-					if w.Address == address {
-						m.selectedWallet = &w
-						m.initWalletPassword()
-						return m, nil
+			// Only try to access the table if there are wallets
+			if len(m.wallets) > 0 {
+				selectedRow := m.walletTable.SelectedRow()
+				if len(selectedRow) > 1 {
+					address := selectedRow[1]
+					// Buscar wallet pela address
+					for _, w := range m.wallets {
+						if w.Address == address {
+							m.selectedWallet = &w
+							m.initWalletPassword()
+							return m, nil
+						}
 					}
 				}
 			}
@@ -908,10 +914,13 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Atualizar a tabela com a mensagem
-	var cmd tea.Cmd
-	m.walletTable, cmd = m.walletTable.Update(msg)
-	return m, cmd
+	// Atualizar a tabela com a mensagem apenas se houver wallets
+	if len(m.wallets) > 0 {
+		var cmd tea.Cmd
+		m.walletTable, cmd = m.walletTable.Update(msg)
+		return m, cmd
+	}
+	return m, nil
 }
 
 func (m *CLIModel) updateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -953,6 +962,19 @@ func (m *CLIModel) updateWalletDetails(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc", "backspace":
 			m.walletDetails = nil
 			m.currentView = constants.ListWalletsView
+
+			// Ensure the wallet list is properly initialized before showing it
+			wallets, err := m.Service.GetAllWallets()
+			if err == nil {
+				m.wallets = wallets
+				m.walletCount = len(wallets)
+
+				// Only initialize the table if there are wallets
+				if len(wallets) > 0 {
+					m.rebuildWalletsTable()
+				}
+			}
+
 			return m, nil // Return explícito para consumir o evento de teclado
 		}
 	}
@@ -981,7 +1003,9 @@ func (m *CLIModel) updateTableDimensions() {
 
 	// Definir largura e altura da tabela
 	m.walletTable.SetWidth(m.width - 4)
-	m.walletTable.SetHeight(contentAreaHeight)
+	if len(m.wallets) > 0 {
+		m.walletTable.SetHeight(contentAreaHeight)
+	}
 
 	// Calcular larguras das colunas
 	idColWidth := 10
@@ -1088,7 +1112,9 @@ func (m *CLIModel) initListWallets() {
 	if contentAreaHeight < 0 {
 		contentAreaHeight = 0
 	}
-	m.walletTable.SetHeight(contentAreaHeight)
+	if len(m.wallets) > 0 {
+		m.walletTable.SetHeight(contentAreaHeight)
+	}
 
 	// Atualizar dimensões da tabela
 	m.updateTableDimensions()
@@ -1131,8 +1157,10 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 			rows = append(rows, table.Row{fmt.Sprintf("%d", w.ID), w.Address})
 		}
 
-		// Atualizar a tabela com as novas linhas
-		m.walletTable.SetRows(rows)
+		// Atualizar a tabela com as novas linhas apenas se houver wallets
+		if len(rows) > 0 {
+			m.walletTable.SetRows(rows)
+		}
 
 		// Retornar uma mensagem personalizada para indicar que a lista foi atualizada
 		return walletsRefreshedMsg{}
@@ -1140,6 +1168,11 @@ func (m *CLIModel) refreshWalletsTable() tea.Cmd {
 }
 
 func (m *CLIModel) rebuildWalletsTable() {
+	// Only create a table if there are wallets
+	if len(m.wallets) == 0 {
+		return
+	}
+
 	// Inicialize as colunas com larguras adequadas
 	idColWidth := 10
 	addressColWidth := m.width - idColWidth - 8 // Subtrai 8 para padding e margens

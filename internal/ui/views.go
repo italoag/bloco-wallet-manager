@@ -306,18 +306,32 @@ func (m *CLIModel) viewListWallets() string {
 
 		view.WriteString(title + "\n")
 
-		// Adicionar a visualização da tabela
-		tableView := m.walletTable.View()
-		view.WriteString(tableView)
-
-		// Se houver espaço, adicionar instruções na parte inferior
-		if m.walletTable.Height() < len(m.wallets) {
-			// Só mostra instruções de rolagem se houver mais itens que o espaço disponível
-			instructions := "\n" + lipgloss.NewStyle().
+		// Verificar se há wallets para exibir
+		if len(m.wallets) == 0 {
+			// Exibir mensagem quando não há wallets
+			message := "No wallets found. Create a new wallet to get started."
+			if val, ok := localization.Labels["no_wallets_message"]; ok {
+				message = val
+			}
+			noWalletsMsg := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#5C5C5C")).
-				Render(localization.Labels["list_wallets_instructions"])
+				Render(message)
 
-			view.WriteString(instructions)
+			view.WriteString(noWalletsMsg)
+		} else {
+			// Adicionar a visualização da tabela
+			tableView := m.walletTable.View()
+			view.WriteString(tableView)
+
+			// Se houver espaço, adicionar instruções na parte inferior
+			if m.walletTable.Height() < len(m.wallets) {
+				// Só mostra instruções de rolagem se houver mais itens que o espaço disponível
+				instructions := "\n" + lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#5C5C5C")).
+					Render(localization.Labels["list_wallets_instructions"])
+
+				view.WriteString(instructions)
+			}
 		}
 
 		return view.String()
@@ -330,7 +344,13 @@ func (m *CLIModel) viewListWallets() string {
 // renderDeleteConfirmationDialog renderiza o diálogo de confirmação de exclusão
 func (m *CLIModel) renderDeleteConfirmationDialog() string {
 	// Primeiro, renderizar a tabela de wallets
-	tableView := m.walletTable.View()
+	var tableView string
+	if len(m.wallets) > 0 {
+		tableView = m.walletTable.View()
+	} else {
+		// Se não há wallets, criar uma área vazia para o diálogo
+		tableView = strings.Repeat("\n", 10)
+	}
 
 	// Caixa de diálogo centralizada com botões estilizados e seleção
 	question := localization.Labels["confirm_delete_wallet"]
