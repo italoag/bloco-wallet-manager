@@ -3,7 +3,6 @@ package localization
 import (
 	"blocowallet/pkg/config"
 	"fmt"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,12 @@ func TestInitLocalization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("Failed to remove temp directory: %v", err)
+		}
+	}(tempDir)
 
 	// Create a test config
 	cfg := &config.Config{
@@ -52,7 +56,12 @@ func TestT(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("Failed to remove temp directory: %v", err)
+		}
+	}(tempDir)
 
 	// Create a test config
 	cfg := &config.Config{
@@ -92,7 +101,12 @@ func TestTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("Failed to remove temp directory: %v", err)
+		}
+	}(tempDir)
 
 	// Create a test config
 	cfg := &config.Config{
@@ -107,72 +121,71 @@ func TestTP(t *testing.T) {
 		t.Fatalf("InitLocalization failed: %v", err)
 	}
 
-	// Create a test plural message
-	testMsg := `
+	// Criar manualmente um arquivo de mensagem plural para teste
+	pluralContent := `
+# Plural test messages
+
 [cats]
 one = "{{.Name}} has {{.Count}} cat."
 other = "{{.Name}} has {{.Count}} cats."
+
+[apples]
+one = "One apple"
+other = "{{.Count}} apples"
 `
-	testFile := filepath.Join(cfg.LocaleDir, "test_plural.toml")
-	err = os.WriteFile(testFile, []byte(testMsg), 0644)
+	// Salvar o arquivo de mensagens plurais
+	err = os.MkdirAll(cfg.LocaleDir, 0755)
 	if err != nil {
-		t.Fatalf("Failed to create test plural message: %v", err)
+		t.Fatalf("Failed to create locale directory: %v", err)
 	}
 
-	// Load the test message file directly into the bundle
-	_, err = bundle.LoadMessageFile(testFile)
+	pluralFilePath := filepath.Join(cfg.LocaleDir, "plural_test.en.toml")
+	err = os.WriteFile(pluralFilePath, []byte(pluralContent), 0644)
 	if err != nil {
-		t.Fatalf("Failed to load test message file: %v", err)
+		t.Fatalf("Failed to create plural test file: %v", err)
 	}
 
-	// Test plural translation with count=1
+	// Recarregar os arquivos de mensagem para incluir o novo arquivo plural
+	err = loadMessageFiles(cfg.LocaleDir)
+	if err != nil {
+		t.Fatalf("Failed to reload message files: %v", err)
+	}
+
+	// Teste com contagem = 1 (singular)
 	data := map[string]interface{}{
 		"Name": "John",
 	}
 
-	// Debug: Print the message file content
-	fileContent, _ := os.ReadFile(testFile)
-	t.Logf("Test file content: %s", fileContent)
-
-	// Debug: Try to get the message directly from the localizer
-	msg, err := localizer.Localize(&i18n.LocalizeConfig{
-		DefaultMessage: &i18n.Message{
-			ID: "cats",
-			One: "{{.Name}} has {{.Count}} cat.",
-			Other: "{{.Name}} has {{.Count}} cats.",
-		},
-		TemplateData: map[string]interface{}{
-			"Name":  "John",
-			"Count": 1,
-		},
-		PluralCount: 1,
-	})
-	if err != nil {
-		t.Logf("Error localizing directly: %v", err)
-	} else {
-		t.Logf("Direct localizer localization: %s", msg)
-	}
-
-	// Use our TP function
 	translation := TP("cats", 1, data)
-	t.Logf("TP function result: %s", translation)
-
 	if translation == "" || translation == "cats" {
-		t.Errorf("Plural translation failed for cats with count=1")
-	}
-	if translation != "John has 1 cat." {
-		t.Errorf("Incorrect plural translation for count=1: %s", translation)
+		t.Errorf("Plural translation failed for cats with count=1, got: %s", translation)
 	}
 
-	// Test plural translation with count=2
+	expectedSingular := "John has 1 cat."
+	if translation != expectedSingular {
+		t.Errorf("Expected '%s' but got '%s'", expectedSingular, translation)
+	}
+
+	// Teste com contagem = 2 (plural)
 	translation = TP("cats", 2, data)
-	t.Logf("TP function result (count=2): %s", translation)
-
 	if translation == "" || translation == "cats" {
-		t.Errorf("Plural translation failed for cats with count=2")
+		t.Errorf("Plural translation failed for cats with count=2, got: %s", translation)
 	}
-	if translation != "John has 2 cats." {
-		t.Errorf("Incorrect plural translation for count=2: %s", translation)
+
+	expectedPlural := "John has 2 cats."
+	if translation != expectedPlural {
+		t.Errorf("Expected '%s' but got '%s'", expectedPlural, translation)
+	}
+
+	// Teste com outro ID de mensagem
+	translation = TP("apples", 1, nil)
+	if translation != "One apple" {
+		t.Errorf("Expected 'One apple' but got '%s'", translation)
+	}
+
+	translation = TP("apples", 5, nil)
+	if translation != "5 apples" {
+		t.Errorf("Expected '5 apples' but got '%s'", translation)
 	}
 }
 
@@ -182,7 +195,12 @@ func TestChangeLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("Failed to remove temp directory: %v", err)
+		}
+	}(tempDir)
 
 	// Create a test config
 	cfg := &config.Config{

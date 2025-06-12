@@ -8,6 +8,7 @@ import (
 	"golang.org/x/text/language"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -139,7 +140,14 @@ func createLanguageFile(filePath, lang string) error {
 	content = "# " + getLanguageName(lang) + " translations\n\n"
 	for key, value := range messages {
 		content += "[" + key + "]\n"
-		content += "other = \"" + value + "\"\n\n"
+		// Use triple-quoted string for multi-line support or escape newlines
+		if strings.Contains(value, "\n") {
+			// Triple quotes for multi-line strings in TOML
+			content += "other = \"\"\"" + value + "\"\"\"\n\n"
+		} else {
+			// Regular quoted string for single-line values
+			content += "other = \"" + value + "\"\n\n"
+		}
 	}
 
 	// Write the content to the file
