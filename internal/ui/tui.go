@@ -597,12 +597,15 @@ func (m *CLIModel) updateCreateWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 		switch msg.String() {
 		case "enter":
 			password := strings.TrimSpace(m.passwordInput.Value())
-			if len(password) < constants.PasswordMinLength {
-				m.err = errors.Wrap(fmt.Errorf(localization.Labels["password_too_short"]), 0)
+
+			// Validar a complexidade da senha
+			validationErr, isValid := wallet.ValidatePassword(password)
+			if !isValid {
+				m.err = errors.Wrap(fmt.Errorf(validationErr.GetErrorMessage()), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = constants.DefaultView
 				return m, nil
 			}
+
 			name := strings.TrimSpace(m.nameInput.Value())
 			walletDetails, err := m.Service.CreateWallet(name, password)
 			if err != nil {
@@ -673,10 +676,12 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 		switch msg.String() {
 		case "enter":
 			password := strings.TrimSpace(m.passwordInput.Value())
-			if len(password) < constants.PasswordMinLength {
-				m.err = errors.Wrap(fmt.Errorf(localization.Labels["password_too_short"]), 0)
+
+			// Validar a complexidade da senha
+			validationErr, isValid := wallet.ValidatePassword(password)
+			if !isValid {
+				m.err = errors.Wrap(fmt.Errorf(validationErr.GetErrorMessage()), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
-				m.currentView = constants.DefaultView
 				return m, nil
 			}
 
