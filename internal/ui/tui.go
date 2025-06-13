@@ -570,7 +570,11 @@ func (m *CLIModel) updateCreateWalletName(msg tea.Msg) (tea.Model, tea.Cmd) {
 			name := strings.TrimSpace(m.nameInput.Value())
 			if name == "" {
 				m.err = errors.Wrap(fmt.Errorf("O nome da wallet não pode estar vazio"), 0)
-				log.Println(m.err.(*errors.Error).ErrorStack())
+				if wrappedErr, ok := m.err.(*errors.Error); ok {
+					log.Println(wrappedErr.ErrorStack())
+				} else {
+					log.Println("Error:", m.err)
+				}
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
