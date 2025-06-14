@@ -337,6 +337,24 @@ func (m *CLIModel) viewImportPrivateKey() string {
 	)
 }
 
+// viewImportKeystore renderiza a visualização de importação de arquivo keystore
+func (m *CLIModel) viewImportKeystore() string {
+	// Use MenuTitle style for the header
+	title := m.styles.MenuTitle.Render(localization.Labels["keystore_title"])
+	input := m.privateKeyInput.View()
+	// Instructions for the user
+	instructions := m.styles.MenuDesc.Render(localization.Labels["press_enter"] + " | Tab to show/cycle through suggestions")
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		"",
+		input,
+		"",
+		instructions,
+	)
+}
+
 // viewListWallets renderiza a visualização de listagem de wallets
 func (m *CLIModel) viewListWallets() string {
 	if localization.Labels == nil {

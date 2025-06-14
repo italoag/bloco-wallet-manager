@@ -312,6 +312,8 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateImportWallet(msg)
 	case constants.ImportPrivateKeyView:
 		return m.updateImportPrivateKey(msg)
+	case constants.ImportKeystoreView:
+		return m.updateImportKeystore(msg)
 	case constants.ImportWalletPasswordView:
 		return m.updateImportWalletPassword(msg)
 	case constants.ListWalletsView:
@@ -591,6 +593,8 @@ func (m *CLIModel) getContentView() string {
 		return m.viewImportWallet()
 	case constants.ImportPrivateKeyView:
 		return m.viewImportPrivateKey()
+	case constants.ImportKeystoreView:
+		return m.viewImportKeystore()
 	case constants.ImportWalletPasswordView:
 		return m.viewImportWalletPassword()
 	case constants.ListWalletsView:
@@ -787,15 +791,22 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			var name string
 			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
 				name = "Imported Private Key Wallet"
+			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+				// If mnemonic field contains a path to a keystore file
+				name = "Imported Keystore Wallet"
 			} else {
 				name = "Imported Mnemonic Wallet"
 			}
 
-			// Check if we're coming from private key import or mnemonic import
+			// Check which import method we're using
 			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
 				// Import from private key
 				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
 				walletDetails, err = m.Service.ImportWalletFromPrivateKey(name, privateKey, password)
+			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+				// Import from keystore file
+				keystorePath := m.mnemonic // We stored the keystore path in the mnemonic field
+				walletDetails, err = m.Service.ImportWalletFromKeystore(name, keystorePath, password)
 			} else {
 				// Import from mnemonic
 				mnemonic := strings.Join(m.importWords, " ")
@@ -805,6 +816,13 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			if err != nil {
 				m.err = errors.Wrap(err, 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
+
+				// If it's a password error for keystore, stay on the password screen
+				if strings.Contains(err.Error(), "incorrect password for keystore") {
+					// Just show the error and stay on the password screen
+					return m, nil
+				}
+
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
@@ -868,7 +886,10 @@ func (m *CLIModel) updateImportMethodSelection(msg tea.Msg) (tea.Model, tea.Cmd)
 				m.privateKeyInput.Focus()
 				m.currentView = constants.ImportPrivateKeyView
 
-			case 2: // Terceira opção: Voltar ao menu principal
+			case 2: // Terceira opção: Importar por arquivo keystore
+				m.initImportKeystore()
+
+			case 3: // Quarta opção: Voltar ao menu principal
 				m.menuItems = NewMenu() // Recarregar o menu principal
 				m.selectedMenu = 0      // Resetar a seleção
 				m.currentView = constants.DefaultView
@@ -953,6 +974,171 @@ func (m *CLIModel) updateImportPrivateKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			var cmd tea.Cmd
 			m.privateKeyInput, cmd = m.privateKeyInput.Update(msg)
+
+			// Update suggestions as the user types
+			if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
+				// Get current path
+				currentPath := m.privateKeyInput.Value()
+				if currentPath == "" {
+					currentPath = "."
+				}
+
+				// Get the directory and partial filename
+				dir := filepath.Dir(currentPath)
+				if dir == "." && !strings.HasPrefix(currentPath, "./") && !strings.HasPrefix(currentPath, "/") {
+					dir = currentPath
+				}
+
+				// Read the directory
+				files, err := os.ReadDir(dir)
+				if err == nil {
+					// Find matching files
+					var matches []string
+					partial := filepath.Base(currentPath)
+					for _, file := range files {
+						if strings.HasPrefix(file.Name(), partial) {
+							fullPath := filepath.Join(dir, file.Name())
+							if file.IsDir() {
+								fullPath += "/"
+							}
+							matches = append(matches, fullPath)
+						}
+					}
+
+					// Set all matches as suggestions
+					if len(matches) > 0 {
+						m.privateKeyInput.SetSuggestions(matches)
+					}
+				}
+			}
+
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
+func (m *CLIModel) updateImportKeystore(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			keystorePath := strings.TrimSpace(m.privateKeyInput.Value())
+			if keystorePath == "" {
+				m.err = errors.Wrap(fmt.Errorf(localization.Labels["invalid_keystore"]), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Check if file exists
+			if _, err := os.Stat(keystorePath); os.IsNotExist(err) {
+				m.err = errors.Wrap(fmt.Errorf(localization.Labels["invalid_keystore"]), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Store the keystore path for later use
+			m.mnemonic = keystorePath // Reusing mnemonic field to store keystore path
+
+			// Move to password input screen
+			m.passwordInput = textinput.New()
+			m.passwordInput.Placeholder = localization.Labels["enter_password"]
+			m.passwordInput.CharLimit = constants.PasswordCharLimit
+			m.passwordInput.Width = constants.PasswordWidth
+			m.passwordInput.EchoMode = textinput.EchoPassword
+			m.passwordInput.EchoCharacter = '•'
+			m.passwordInput.Focus()
+			m.currentView = constants.ImportWalletPasswordView
+
+		case "esc", "backspace":
+			m.currentView = constants.ImportMethodSelectionView
+		case "tab":
+			// Implement path autocomplete
+			currentPath := m.privateKeyInput.Value()
+			if currentPath == "" {
+				currentPath = "."
+			}
+
+			// Get the directory and partial filename
+			dir := filepath.Dir(currentPath)
+			if dir == "." && !strings.HasPrefix(currentPath, "./") && !strings.HasPrefix(currentPath, "/") {
+				dir = currentPath
+			}
+
+			// Read the directory
+			files, err := os.ReadDir(dir)
+			if err != nil {
+				return m, nil
+			}
+
+			// Find matching files
+			var matches []string
+			partial := filepath.Base(currentPath)
+			for _, file := range files {
+				if strings.HasPrefix(file.Name(), partial) {
+					fullPath := filepath.Join(dir, file.Name())
+					if file.IsDir() {
+						fullPath += "/"
+					}
+					matches = append(matches, fullPath)
+				}
+			}
+
+			// Set all matches as suggestions
+			if len(matches) > 0 {
+				m.privateKeyInput.SetSuggestions(matches)
+
+				// If there's exactly one match, use it
+				if len(matches) == 1 {
+					m.privateKeyInput.SetValue(matches[0])
+				}
+			}
+
+			// Let the textinput component handle the tab key
+			var cmd tea.Cmd
+			m.privateKeyInput, cmd = m.privateKeyInput.Update(msg)
+			return m, cmd
+		default:
+			var cmd tea.Cmd
+			m.privateKeyInput, cmd = m.privateKeyInput.Update(msg)
+
+			// Update suggestions as the user types
+			if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
+				// Get current path
+				currentPath := m.privateKeyInput.Value()
+				if currentPath == "" {
+					currentPath = "."
+				}
+
+				// Get the directory and partial filename
+				dir := filepath.Dir(currentPath)
+				if dir == "." && !strings.HasPrefix(currentPath, "./") && !strings.HasPrefix(currentPath, "/") {
+					dir = currentPath
+				}
+
+				// Read the directory
+				files, err := os.ReadDir(dir)
+				if err == nil {
+					// Find matching files
+					var matches []string
+					partial := filepath.Base(currentPath)
+					for _, file := range files {
+						if strings.HasPrefix(file.Name(), partial) {
+							fullPath := filepath.Join(dir, file.Name())
+							if file.IsDir() {
+								fullPath += "/"
+							}
+							matches = append(matches, fullPath)
+						}
+					}
+
+					// Set all matches as suggestions
+					if len(matches) > 0 {
+						m.privateKeyInput.SetSuggestions(matches)
+					}
+				}
+			}
+
 			return m, cmd
 		}
 	}
@@ -1216,6 +1402,18 @@ func (m *CLIModel) initImportPrivateKey() {
 	m.privateKeyInput.Width = 66
 	m.privateKeyInput.Focus()
 	m.currentView = constants.ImportPrivateKeyView
+}
+
+// initImportKeystore initializes the keystore import view
+func (m *CLIModel) initImportKeystore() {
+	// Setup keystore path input with autocomplete
+	m.privateKeyInput = textinput.New()
+	m.privateKeyInput.Placeholder = localization.Labels["enter_keystore_path"]
+	m.privateKeyInput.CharLimit = 256 // Path can be long
+	m.privateKeyInput.Width = 66
+	m.privateKeyInput.Focus()
+	m.privateKeyInput.ShowSuggestions = true // Enable suggestions
+	m.currentView = constants.ImportKeystoreView
 }
 
 func (m *CLIModel) initImportWallet() {

@@ -197,6 +197,91 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 	return walletDetails, nil
 }
 
+func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password string) (*WalletDetails, error) {
+	// Read the keystore file
+	keyJSON, err := os.ReadFile(keystorePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading the keystore file: %v", err)
+	}
+
+	// Decrypt the keystore file to verify the password and extract the address
+	key, err := keystore.DecryptKey(keyJSON, password)
+	if err != nil {
+		return nil, fmt.Errorf("incorrect password for keystore file")
+	}
+
+	// Get the address from the key
+	address := key.Address.Hex()
+
+	// Create the destination filename with 0x prefix
+	destFilename := fmt.Sprintf("0x%s.json", address[2:]) // Remove "0x" prefix if present and add it back
+
+	// Get the keystore directory
+	var keystoreDir string
+
+	// Check if there are any accounts in the keystore
+	accounts := ws.KeyStore.Accounts()
+	if len(accounts) > 0 {
+		// Use the directory of the first account
+		keystoreDir = filepath.Dir(accounts[0].URL.Path)
+	} else {
+		// If there are no accounts, use a default path
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("error getting user home directory: %v", err)
+		}
+		keystoreDir = filepath.Join(homeDir, ".wallets", "keystore")
+	}
+
+	// Create the destination path
+	destPath := filepath.Join(keystoreDir, destFilename)
+
+	// Copy the keystore file to the destination
+	destFile, err := os.Create(destPath)
+	if err != nil {
+		return nil, fmt.Errorf("error creating destination file: %v", err)
+	}
+	defer destFile.Close()
+
+	// Write the keystore JSON to the destination file
+	_, err = destFile.Write(keyJSON)
+	if err != nil {
+		return nil, fmt.Errorf("error writing to destination file: %v", err)
+	}
+
+	// Generate a mnemonic from private key (for compatibility with the rest of the app)
+	privateKeyBytes := crypto.FromECDSA(key.PrivateKey)
+	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
+	mnemonic, err := bip39.NewMnemonic(entropy)
+	if err != nil {
+		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+	}
+
+	// Create the wallet entry
+	wallet := &Wallet{
+		Name:         name,
+		Address:      address,
+		KeyStorePath: destPath,
+		Mnemonic:     mnemonic, // Store the generated mnemonic for compatibility
+	}
+
+	// Add wallet to repository
+	err = ws.Repo.AddWallet(wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return wallet details
+	walletDetails := &WalletDetails{
+		Wallet:     wallet,
+		Mnemonic:   mnemonic,
+		PrivateKey: key.PrivateKey,
+		PublicKey:  &key.PrivateKey.PublicKey,
+	}
+
+	return walletDetails, nil
+}
+
 func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDetails, error) {
 	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
 	if err != nil {
