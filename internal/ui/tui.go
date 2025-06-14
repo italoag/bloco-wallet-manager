@@ -1211,8 +1211,8 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only try to access the table if there are wallets
 			if len(m.wallets) > 0 {
 				selectedRow := m.walletTable.SelectedRow()
-				if len(selectedRow) > 2 {
-					address := selectedRow[2]
+				if len(selectedRow) > 4 {
+					address := selectedRow[4]
 					for i, w := range m.wallets {
 						if w.Address == address {
 							m.deletingWallet = &m.wallets[i]
@@ -1225,8 +1225,8 @@ func (m *CLIModel) updateListWallets(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only try to access the table if there are wallets
 			if len(m.wallets) > 0 {
 				selectedRow := m.walletTable.SelectedRow()
-				if len(selectedRow) > 2 {
-					address := selectedRow[2]
+				if len(selectedRow) > 4 {
+					address := selectedRow[4]
 					// Buscar wallet pela address
 					for _, w := range m.wallets {
 						if w.Address == address {
