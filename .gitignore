@@ -32,3 +32,4 @@ bin/
 .env
 /blocowallet.log
 /wallets.db
+build/
