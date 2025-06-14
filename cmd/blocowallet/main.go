@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -54,10 +56,32 @@ func main() {
 	}
 
 	// Inicializar a localização
-	err = localization.SetLanguage(cfg.Language, appDir)
+	err = localization.InitLocalization(cfg)
 	if err != nil {
 		handleError("Erro ao carregar os arquivos de localização", err)
 	}
+
+	// Set version from build info
+	if info, ok := debug.ReadBuildInfo(); ok {
+		version := "0.1.0" // Default version if not found
+
+		// Try to find version from build info
+		for _, setting := range info.Settings {
+			if strings.HasPrefix(setting.Key, "vcs.revision") {
+				// Use first 7 characters of commit hash
+				if len(setting.Value) >= 7 {
+					version = "0.2.0" // Use semantic versioning
+					break
+				}
+			}
+		}
+
+		// Set version in localization labels
+		localization.Labels["version"] = version
+	}
+
+	// Inicializar o serviço de criptografia
+	wallet.InitCryptoService(cfg)
 
 	// Garantir que o diretório de wallets exista
 	if _, err := os.Stat(cfg.WalletsDir); os.IsNotExist(err) {
@@ -67,8 +91,8 @@ func main() {
 		}
 	}
 
-	// Inicializar o repositório
-	repo, err := storage.NewSQLiteRepository(cfg.DatabasePath)
+	// Inicializar o repositório usando GORM com suporte a múltiplos bancos de dados
+	repo, err := storage.NewWalletRepository(cfg)
 	if err != nil {
 		handleError("Erro ao inicializar o banco de dados", err)
 	}
@@ -102,7 +126,7 @@ func closeFile(file *os.File) {
 	}
 }
 
-func closeResource(repo *storage.SQLiteRepository) {
+func closeResource(repo wallet.WalletRepository) {
 	if err := repo.Close(); err != nil {
 		log.Printf("Erro ao fechar o banco de dados: %v\n", err)
 	}

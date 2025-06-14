@@ -31,7 +31,7 @@ func NewWalletService(repo WalletRepository, ks *keystore.KeyStore) *WalletServi
 	}
 }
 
-func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
+func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, error) {
 	mnemonic, err := GenerateMnemonic()
 	if err != nil {
 		return nil, err
@@ -61,6 +61,7 @@ func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
 	}
 
 	wallet := &Wallet{
+		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
@@ -81,7 +82,7 @@ func (ws *WalletService) CreateWallet(password string) (*WalletDetails, error) {
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails, error) {
+func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletDetails, error) {
 	if !bip39.IsMnemonicValid(mnemonic) {
 		return nil, fmt.Errorf("invalid mnemonic phrase")
 	}
@@ -110,6 +111,7 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 	}
 
 	wallet := &Wallet{
+		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the mnemonic
@@ -130,7 +132,7 @@ func (ws *WalletService) ImportWallet(mnemonic, password string) (*WalletDetails
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWalletFromPrivateKey(privateKeyHex, password string) (*WalletDetails, error) {
+func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, password string) (*WalletDetails, error) {
 	// Remove "0x" prefix if present
 	if len(privateKeyHex) > 2 && privateKeyHex[:2] == "0x" {
 		privateKeyHex = privateKeyHex[2:]
@@ -172,6 +174,7 @@ func (ws *WalletService) ImportWalletFromPrivateKey(privateKeyHex, password stri
 
 	// Create the wallet entry with the generated mnemonic
 	wallet := &Wallet{
+		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
 		Mnemonic:     mnemonic, // Store the generated mnemonic

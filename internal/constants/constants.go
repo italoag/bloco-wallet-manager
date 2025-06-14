@@ -8,6 +8,7 @@ const (
 	PasswordMinLength         = 8
 	DefaultView               = "menu"
 	SplashView                = "splash"
+	CreateWalletNameView      = "create_wallet_name"
 	CreateWalletView          = "create_wallet_password"
 	ImportWalletView          = "import_wallet"
 	ImportWalletPasswordView  = "import_wallet_password"
@@ -18,7 +19,6 @@ const (
 	WalletDetailsView         = "wallet_details"
 	StyleWidth                = 40
 	StyleMargin               = 1
-	ConfigFontsPath           = "config/fonts.json"
 	SplashDuration            = 2 * time.Second
 	ErrorFontNotFoundMessage  = "Fonte não encontrada nos diretórios especificados."
 	MnemonicWordCount         = 12
