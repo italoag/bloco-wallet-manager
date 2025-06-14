@@ -322,6 +322,8 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWalletDetails(msg)
 	case constants.ConfigurationView:
 		return m.updateConfigMenu(msg)
+	case constants.LanguageSelectionView:
+		return m.updateLanguageSelection(msg)
 	default:
 		m.currentView = constants.DefaultView
 		return m, nil
@@ -536,6 +538,45 @@ func (m *CLIModel) renderConfigMenuItems() string {
 	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
 }
 
+// renderLanguageMenuItems renderiza os itens do menu de idiomas
+func (m *CLIModel) renderLanguageMenuItems() string {
+	// Renderizar cada item do menu
+	var menuItems []string
+	for i, item := range m.menuItems {
+		style := m.styles.MenuItem
+		titleStyle := m.styles.MenuTitle
+		if i == m.selectedMenu {
+			style = m.styles.MenuSelected
+			titleStyle = m.styles.SelectedTitle
+		}
+		menuText := fmt.Sprintf("%s\n%s", titleStyle.Render(item.title), m.styles.MenuDesc.Render(item.description))
+		menuItems = append(menuItems, style.Render(menuText))
+	}
+
+	// Organizar itens em linhas
+	numRows := (len(menuItems) + 1) / 2
+	var menuRows []string
+	for i := 0; i < numRows; i++ {
+		startIndex := i * 2
+		endIndex := startIndex + 2
+		if endIndex > len(menuItems) {
+			endIndex = len(menuItems)
+		}
+
+		// Se temos dois itens na linha
+		if endIndex-startIndex == 2 {
+			// Unir horizontalmente com espaçamento
+			menuRows = append(menuRows, lipgloss.JoinHorizontal(lipgloss.Top, menuItems[startIndex], "  ", menuItems[startIndex+1]))
+		} else {
+			// Apenas um item na linha
+			menuRows = append(menuRows, menuItems[startIndex])
+		}
+	}
+
+	// Unir todas as linhas verticalmente
+	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
+}
+
 func (m *CLIModel) getContentView() string {
 	switch m.currentView {
 	case constants.DefaultView:
@@ -560,6 +601,8 @@ func (m *CLIModel) getContentView() string {
 		return m.viewWalletDetails()
 	case constants.ConfigurationView:
 		return m.viewConfigMenu()
+	case constants.LanguageSelectionView:
+		return m.viewLanguageSelection()
 	default:
 		return localization.Labels["unknown_state"]
 	}
@@ -826,12 +869,14 @@ func (m *CLIModel) updateImportMethodSelection(msg tea.Msg) (tea.Model, tea.Cmd)
 				m.currentView = constants.ImportPrivateKeyView
 
 			case 2: // Terceira opção: Voltar ao menu principal
+				m.menuItems = NewMenu() // Recarregar o menu principal
+				m.selectedMenu = 0      // Resetar a seleção
 				m.currentView = constants.DefaultView
-				m.selectedMenu = 0
 			}
 		case "esc", "backspace":
+			m.menuItems = NewMenu() // Recarregar o menu principal
+			m.selectedMenu = 0      // Resetar a seleção
 			m.currentView = constants.DefaultView
-			m.selectedMenu = 0
 		}
 	}
 	return m, nil
@@ -858,22 +903,24 @@ func (m *CLIModel) updateConfigMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case 0: // Primeira opção: Redes
 				// Aqui seria implementada a lógica para configurar redes
 				// Por enquanto, apenas volta ao menu principal
+				m.menuItems = NewMenu() // Recarregar o menu principal
+				m.selectedMenu = 0      // Resetar a seleção
 				m.currentView = constants.DefaultView
-				m.selectedMenu = 0
 
 			case 1: // Segunda opção: Idioma
-				// Aqui seria implementada a lógica para configurar idioma
-				// Por enquanto, apenas volta ao menu principal
-				m.currentView = constants.DefaultView
-				m.selectedMenu = 0
+				// Implementar a lógica para configurar idioma
+				m.initLanguageSelection()
+				return m, nil
 
 			case 2: // Terceira opção: Voltar ao menu principal
+				m.menuItems = NewMenu() // Recarregar o menu principal
+				m.selectedMenu = 0      // Resetar a seleção
 				m.currentView = constants.DefaultView
-				m.selectedMenu = 0
 			}
 		case "esc", "backspace":
+			m.menuItems = NewMenu() // Recarregar o menu principal
+			m.selectedMenu = 0      // Resetar a seleção
 			m.currentView = constants.DefaultView
-			m.selectedMenu = 0
 		}
 	}
 	return m, nil
@@ -1273,6 +1320,128 @@ func (m *CLIModel) initWalletPassword() {
 	m.passwordInput.EchoCharacter = '•'
 	m.passwordInput.Focus()
 	m.currentView = constants.WalletPasswordView
+}
+
+// initLanguageSelection initializes the language selection view
+func (m *CLIModel) initLanguageSelection() {
+	// Load the current configuration
+	appDir := filepath.Join(os.Getenv("HOME"), ".wallets")
+	cfg, err := config.LoadConfig(appDir)
+	if err != nil {
+		m.err = errors.Wrap(err, 0)
+		m.currentView = constants.DefaultView
+		return
+	}
+
+	// Store the current configuration
+	m.currentConfig = cfg
+
+	// Set the menu items to the language menu items
+	m.menuItems = NewLanguageMenu(cfg)
+
+	// Reset the selected menu item
+	m.selectedMenu = 0
+
+	// Set the current view to language selection
+	m.currentView = constants.LanguageSelectionView
+}
+
+// updateLanguageSelection handles user input in the language selection view
+func (m *CLIModel) updateLanguageSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.selectedMenu > 0 {
+				m.selectedMenu--
+			}
+		case "down", "j":
+			if m.selectedMenu < len(m.menuItems)-1 {
+				m.selectedMenu++
+			}
+		case "left", "h":
+			if m.selectedMenu > 1 {
+				m.selectedMenu -= 2
+			}
+		case "right", "l":
+			if m.selectedMenu < len(m.menuItems)-2 {
+				m.selectedMenu += 2
+			}
+		case "enter":
+			// If the last item (Back) is selected, return to the config menu
+			if m.selectedMenu == len(m.menuItems)-1 {
+				m.menuItems = NewConfigMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.ConfigurationView
+				return m, nil
+			}
+
+			// Otherwise, change the language
+			selectedLang := m.menuItems[m.selectedMenu].description
+
+			// Update the configuration
+			if m.currentConfig != nil && selectedLang != m.currentConfig.Language {
+				// Get the config file path
+				configPath := filepath.Join(m.currentConfig.AppDir, "config.toml")
+
+				// Read the current config file
+				content, err := os.ReadFile(configPath)
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+					return m, nil
+				}
+
+				// Replace the language setting
+				lines := strings.Split(string(content), "\n")
+				for i, line := range lines {
+					if strings.HasPrefix(strings.TrimSpace(line), "language") {
+						lines[i] = fmt.Sprintf("language = \"%s\"", selectedLang)
+						break
+					}
+				}
+
+				// Write the updated config back to the file
+				err = os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+					return m, nil
+				}
+
+				// Reload the configuration
+				newCfg, err := config.LoadConfig(m.currentConfig.AppDir)
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+					return m, nil
+				}
+
+				// Update the current configuration
+				m.currentConfig = newCfg
+
+				// Reinitialize localization with the new language
+				err = localization.InitLocalization(newCfg)
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+					return m, nil
+				}
+
+				// Return to the config menu
+				m.menuItems = NewConfigMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.ConfigurationView
+			} else {
+				// If no change or error, just return to the config menu
+				m.menuItems = NewConfigMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.ConfigurationView
+			}
+		case "esc", "backspace":
+			// Return to the config menu
+			m.menuItems = NewConfigMenu()
+			m.selectedMenu = 0
+			m.currentView = constants.ConfigurationView
+		}
+	}
+	return m, nil
 }
 
 // walletsRefreshedMsg é uma mensagem personalizada para indicar que a lista de wallets foi atualizada

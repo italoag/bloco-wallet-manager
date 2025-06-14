@@ -18,6 +18,7 @@ const (
 	WalletPasswordView        = "wallet_password"
 	WalletDetailsView         = "wallet_details"
 	ConfigurationView         = "configuration"
+	LanguageSelectionView     = "language_selection"
 	StyleWidth                = 40
 	StyleMargin               = 1
 	SplashDuration            = 2 * time.Second

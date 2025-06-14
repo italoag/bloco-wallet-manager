@@ -2,6 +2,7 @@ package ui
 
 import (
 	"blocowallet/internal/wallet"
+	"blocowallet/pkg/config"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/digitallyserviced/tdfgo/tdf"
@@ -33,4 +34,5 @@ type CLIModel struct {
 	selectedFont      *tdf.TheDrawFont // Fonte selecionada aleatoriamente
 	fontInfo          *tdf.FontInfo    // Informação da fonte selecionada
 	dialogButtonIndex int              // 0 = Confirmar, 1 = Cancelar
+	currentConfig     *config.Config   // Configuração atual da aplicação
 }

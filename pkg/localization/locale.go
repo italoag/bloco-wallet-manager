@@ -203,7 +203,7 @@ func getEnglishMessages() map[string]string {
 		"import_mnemonic_desc":       "Import using 12-word mnemonic phrase",
 		"import_private_key":         "Private Key",
 		"import_private_key_desc":    "Import using a private key",
-		"back_to_menu":               "Back to Main Menu",
+		"back_to_menu":               "Main Menu",
 		"back_to_menu_desc":          "Return to the main menu",
 		"private_key_title":          "Import Wallet via Private Key",
 		"enter_private_key":          "Enter the private key (with or without 0x prefix):",
@@ -234,6 +234,7 @@ func getEnglishMessages() map[string]string {
 		"imported_private_key":       "Private Key",
 		"imported_mnemonic":          "Mnemonic",
 		"version":                    "0.2.0",
+		"current":                    "Current",
 	}
 }
 
@@ -269,10 +270,10 @@ func getPortugueseMessages() map[string]string {
 		"language_desc":              "Alterar idioma da aplicação",
 		"import_method_title":        "Selecione o Método de Importação",
 		"import_mnemonic":            "Frase Mnemônica",
-		"import_mnemonic_desc":       "Importar usando frase mnemônica de 12 palavras",
+		"import_mnemonic_desc":       "Importar usando frase de 12 palavras",
 		"import_private_key":         "Chave Privada",
 		"import_private_key_desc":    "Importar usando uma chave privada",
-		"back_to_menu":               "Voltar ao Menu Principal",
+		"back_to_menu":               "Voltar",
 		"back_to_menu_desc":          "Retornar ao menu principal",
 		"private_key_title":          "Importar Carteira via Chave Privada",
 		"enter_private_key":          "Digite a chave privada (com ou sem prefixo 0x):",
@@ -295,7 +296,7 @@ func getPortugueseMessages() map[string]string {
 		"confirm_title":              "Confirmar",
 		"cancel":                     "Cancelar",
 		"list_wallets":               "Minhas Carteiras",
-		"list_wallets_desc":          "Visualizar e gerenciar suas carteiras",
+		"list_wallets_desc":          "Gerenciar as carteiras",
 		"exit":                       "Sair",
 		"exit_desc":                  "Sair da aplicação",
 		"created_at":                 "Criado Em",
@@ -303,6 +304,7 @@ func getPortugueseMessages() map[string]string {
 		"imported_private_key":       "Chave Privada",
 		"imported_mnemonic":          "Frase Mnemônica",
 		"version":                    "0.2.0",
+		"current":                    "Atual",
 	}
 }
 
@@ -338,10 +340,10 @@ func getSpanishMessages() map[string]string {
 		"language_desc":              "Cambiar idioma de la aplicación",
 		"import_method_title":        "Seleccione el Método de Importación",
 		"import_mnemonic":            "Frase Mnemotécnica",
-		"import_mnemonic_desc":       "Importar usando frase mnemotécnica de 12 palabras",
+		"import_mnemonic_desc":       "Importar usando frase de 12 palabras",
 		"import_private_key":         "Clave Privada",
 		"import_private_key_desc":    "Importar usando una clave privada",
-		"back_to_menu":               "Volver al Menú Principal",
+		"back_to_menu":               "Volver",
 		"back_to_menu_desc":          "Regresar al menú principal",
 		"private_key_title":          "Importar Cartera vía Clave Privada",
 		"enter_private_key":          "Ingrese la clave privada (con o sin prefijo 0x):",
@@ -372,6 +374,7 @@ func getSpanishMessages() map[string]string {
 		"imported_private_key":       "Clave Privada",
 		"imported_mnemonic":          "Frase Mnemónica",
 		"version":                    "0.2.0",
+		"current":                    "Actual",
 	}
 }
 
@@ -434,4 +437,56 @@ func Get(key string) string {
 	}
 
 	return msg
+}
+
+// GetAvailableLanguages returns a list of available languages based on the locale files
+func GetAvailableLanguages(localeDir string) []string {
+	// Default languages that should always be available
+	defaultLanguages := []string{"en", "pt", "es"}
+	availableLanguages := make(map[string]bool)
+
+	// Add default languages to the map
+	for _, lang := range defaultLanguages {
+		availableLanguages[lang] = true
+	}
+
+	// Get all .toml files in the locale directory
+	files, err := filepath.Glob(filepath.Join(localeDir, "*.toml"))
+	if err != nil {
+		// If there's an error, return just the default languages
+		return defaultLanguages
+	}
+
+	// Extract language codes from filenames
+	for _, file := range files {
+		filename := filepath.Base(file)
+		// Expected format: language.{lang}.toml
+		parts := strings.Split(filename, ".")
+		if len(parts) >= 3 && parts[0] == "language" && parts[2] == "toml" {
+			lang := parts[1]
+			availableLanguages[lang] = true
+		}
+	}
+
+	// Convert map to slice
+	result := make([]string, 0, len(availableLanguages))
+	for lang := range availableLanguages {
+		result = append(result, lang)
+	}
+
+	return result
+}
+
+// GetLanguageName returns the full name of a language based on its code
+func GetLanguageName(code string) string {
+	switch code {
+	case "en":
+		return "English"
+	case "pt":
+		return "Portuguese"
+	case "es":
+		return "Spanish"
+	default:
+		return code
+	}
 }

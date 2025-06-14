@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"blocowallet/pkg/config"
 	"blocowallet/pkg/localization"
 )
 
@@ -52,4 +53,35 @@ func NewConfigMenu() []menuItem {
 		{title: localization.Labels["language"], description: localization.Labels["language_desc"]},
 		{title: localization.Labels["back_to_menu"], description: localization.Labels["back_to_menu_desc"]},
 	}
+}
+
+// NewLanguageMenu cria e retorna uma lista de itens do menu de idiomas
+func NewLanguageMenu(cfg *config.Config) []menuItem {
+	// Get the list of available languages
+	languages := localization.GetAvailableLanguages(cfg.LocaleDir)
+
+	// Create menu items for each language
+	menuItems := make([]menuItem, 0, len(languages)+1)
+
+	// Add each language as a menu item
+	for _, lang := range languages {
+		langName := localization.GetLanguageName(lang)
+		// Mark the current language with an asterisk
+		title := langName
+		if lang == cfg.Language {
+			title = langName + " ✓ " + localization.Labels["current"]
+		}
+		menuItems = append(menuItems, menuItem{
+			title:       title,
+			description: localization.Labels["language"] + ": " + lang,
+		})
+	}
+
+	// Add a "Back" option
+	menuItems = append(menuItems, menuItem{
+		title:       localization.Labels["back_to_menu"],
+		description: localization.Labels["back_to_menu_desc"],
+	})
+
+	return menuItems
 }

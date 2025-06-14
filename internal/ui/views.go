@@ -117,6 +117,7 @@ func (m *CLIModel) renderStatusBar() string {
 		constants.WalletPasswordView:        localization.Labels["enter_wallet_password"],
 		constants.WalletDetailsView:         localization.Labels["wallet_details_title"],
 		constants.ConfigurationView:         localization.Labels["configuration"],
+		constants.LanguageSelectionView:     localization.Labels["language"],
 	}
 
 	// Get the view name from the map, or use the current view constant if not found
@@ -502,4 +503,15 @@ func (m *CLIModel) viewWalletDetails() string {
 		return view.String()
 	}
 	return localization.Labels["select_wallet_prompt"]
+}
+
+// viewLanguageSelection renderiza a visualização de seleção de idioma
+func (m *CLIModel) viewLanguageSelection() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	// Em vez de renderizar o menu de idiomas novamente, exibir apenas uma mensagem informativa
+	// já que o menu já é exibido na área padrão de menu
+	return localization.Labels["welcome_message"]
 }
