@@ -65,7 +65,7 @@ func (mp *MultiProvider) RemoveProvider(key string) {
 	}
 }
 
-// GetBalance gets the balance for a wallet on all active networks
+// NetworkBalance holds the balance information for a specific network
 type NetworkBalance struct {
 	NetworkKey  string
 	NetworkName string
@@ -116,48 +116,8 @@ func (mp *MultiProvider) RefreshProviders(cfg *config.Config) {
 	// Track which networks we still need
 	stillNeeded := make(map[string]bool)
 
-	// First handle default networks
+	// First, handle default networks
 	for key, network := range cfg.Networks {
-		stillNeeded[key] = true
-
-		// Skip inactive networks
-		if !network.IsActive {
-			continue
-		}
-
-		// If we already have this provider, continue
-		if _, exists := mp.providers[key]; exists {
-			continue
-		}
-
-		// Create a new provider
-		if network.RPCEndpoint != "" {
-			provider, err := NewEthereum(
-				network.RPCEndpoint,
-				DefaultTimeout,
-				network.Symbol,
-				18, // Most EVM chains use 18 decimals
-				network.Name,
-			)
-			if err != nil {
-				// If we can't connect, use a mock provider
-				mockProvider := NewMock()
-				mp.providers[key] = Provider{
-					balanceProvider: mockProvider,
-					network:         network,
-				}
-			} else {
-				mp.providers[key] = Provider{
-					balanceProvider: provider,
-					network:         network,
-				}
-			}
-			mp.networks[key] = network
-		}
-	}
-
-	// Then handle custom networks
-	for key, network := range cfg.CustomNetworks {
 		stillNeeded[key] = true
 
 		// Skip inactive networks
@@ -209,14 +169,14 @@ func (mp *MultiProvider) RefreshProviders(cfg *config.Config) {
 			// Update network status in cached networks
 			if network, exists := cfg.Networks[key]; exists {
 				mp.networks[key] = network
-			} else if network, exists := cfg.CustomNetworks[key]; exists {
+			} else if network, exists := cfg.Networks[key]; exists {
 				mp.networks[key] = network
 			}
 		}
 	}
 }
 
-// Default timeout for blockchain connections
+// DefaultTimeout for blockchain connections
 const DefaultTimeout = 30 * time.Second
 
 // Close closes all providers

@@ -23,6 +23,7 @@ type Config struct {
 	Fonts        []string
 	Database     DatabaseConfig
 	Security     SecurityConfig
+	Networks     map[string]Network
 }
 
 // DatabaseConfig holds database-specific configuration
@@ -38,6 +39,16 @@ type SecurityConfig struct {
 	Argon2Threads uint8
 	Argon2KeyLen  uint32
 	SaltLength    uint32
+}
+
+// Network creates a new Config instance with default values
+type Network struct {
+	Name        string
+	RPCEndpoint string // RPC endpoint for the network
+	ChainID     int64
+	Symbol      string
+	Explorer    string
+	IsActive    bool
 }
 
 // LoadConfig loads the configuration from a TOML file using Viper
