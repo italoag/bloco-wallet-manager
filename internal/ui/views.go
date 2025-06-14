@@ -116,6 +116,7 @@ func (m *CLIModel) renderStatusBar() string {
 		constants.ListWalletsView:           localization.Labels["list_wallets"],
 		constants.WalletPasswordView:        localization.Labels["enter_wallet_password"],
 		constants.WalletDetailsView:         localization.Labels["wallet_details_title"],
+		constants.ConfigurationView:         localization.Labels["configuration"],
 	}
 
 	// Get the view name from the map, or use the current view constant if not found
@@ -302,6 +303,17 @@ func (m *CLIModel) viewImportMethodSelection() string {
 	}
 
 	// Em vez de renderizar o menu de importação novamente, exibir apenas uma mensagem informativa
+	// já que o menu já é exibido na área padrão de menu
+	return localization.Labels["welcome_message"]
+}
+
+// viewConfigMenu renderiza a visualização de configuração
+func (m *CLIModel) viewConfigMenu() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	// Em vez de renderizar o menu de configuração novamente, exibir apenas uma mensagem informativa
 	// já que o menu já é exibido na área padrão de menu
 	return localization.Labels["welcome_message"]
 }

@@ -320,6 +320,8 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWalletPassword(msg)
 	case constants.WalletDetailsView:
 		return m.updateWalletDetails(msg)
+	case constants.ConfigurationView:
+		return m.updateConfigMenu(msg)
 	default:
 		m.currentView = constants.DefaultView
 		return m, nil
@@ -492,6 +494,48 @@ func (m *CLIModel) renderImportMenuItems() string {
 	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
 }
 
+// renderConfigMenuItems renderiza os itens do menu de configuração
+func (m *CLIModel) renderConfigMenuItems() string {
+	// Criar o menu de configuração
+	configMenu := NewConfigMenu()
+
+	// Renderizar cada item do menu
+	var menuItems []string
+	for i, item := range configMenu {
+		style := m.styles.MenuItem
+		titleStyle := m.styles.MenuTitle
+		if i == m.selectedMenu {
+			style = m.styles.MenuSelected
+			titleStyle = m.styles.SelectedTitle
+		}
+		menuText := fmt.Sprintf("%s\n%s", titleStyle.Render(item.title), m.styles.MenuDesc.Render(item.description))
+		menuItems = append(menuItems, style.Render(menuText))
+	}
+
+	// Organizar itens em linhas
+	numRows := (len(menuItems) + 1) / 2
+	var menuRows []string
+	for i := 0; i < numRows; i++ {
+		startIndex := i * 2
+		endIndex := startIndex + 2
+		if endIndex > len(menuItems) {
+			endIndex = len(menuItems)
+		}
+
+		// Se temos dois itens na linha
+		if endIndex-startIndex == 2 {
+			// Unir horizontalmente com espaçamento
+			menuRows = append(menuRows, lipgloss.JoinHorizontal(lipgloss.Top, menuItems[startIndex], "  ", menuItems[startIndex+1]))
+		} else {
+			// Apenas um item na linha
+			menuRows = append(menuRows, menuItems[startIndex])
+		}
+	}
+
+	// Unir todas as linhas verticalmente
+	return lipgloss.JoinVertical(lipgloss.Left, menuRows...)
+}
+
 func (m *CLIModel) getContentView() string {
 	switch m.currentView {
 	case constants.DefaultView:
@@ -514,6 +558,8 @@ func (m *CLIModel) getContentView() string {
 		return m.viewWalletPassword()
 	case constants.WalletDetailsView:
 		return m.viewWalletDetails()
+	case constants.ConfigurationView:
+		return m.viewConfigMenu()
 	default:
 		return localization.Labels["unknown_state"]
 	}
@@ -547,6 +593,8 @@ func (m *CLIModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initImportWallet()
 			case localization.Labels["list_wallets"]:
 				m.initListWallets()
+			case localization.Labels["configuration"]:
+				m.initConfigMenu()
 			case tea.KeyCtrlX.String(), "q", localization.Labels["exit"]:
 				return m, tea.Quit
 			}
@@ -776,6 +824,48 @@ func (m *CLIModel) updateImportMethodSelection(msg tea.Msg) (tea.Model, tea.Cmd)
 				m.privateKeyInput.Width = 66
 				m.privateKeyInput.Focus()
 				m.currentView = constants.ImportPrivateKeyView
+
+			case 2: // Terceira opção: Voltar ao menu principal
+				m.currentView = constants.DefaultView
+				m.selectedMenu = 0
+			}
+		case "esc", "backspace":
+			m.currentView = constants.DefaultView
+			m.selectedMenu = 0
+		}
+	}
+	return m, nil
+}
+
+func (m *CLIModel) updateConfigMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Criar o menu de configuração
+	configMenu := NewConfigMenu()
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.selectedMenu > 0 {
+				m.selectedMenu--
+			}
+		case "down", "j":
+			if m.selectedMenu < len(configMenu)-1 {
+				m.selectedMenu++
+			}
+		case "enter":
+			// Usar o menu de configuração para determinar a ação baseada na seleção
+			switch m.selectedMenu {
+			case 0: // Primeira opção: Redes
+				// Aqui seria implementada a lógica para configurar redes
+				// Por enquanto, apenas volta ao menu principal
+				m.currentView = constants.DefaultView
+				m.selectedMenu = 0
+
+			case 1: // Segunda opção: Idioma
+				// Aqui seria implementada a lógica para configurar idioma
+				// Por enquanto, apenas volta ao menu principal
+				m.currentView = constants.DefaultView
+				m.selectedMenu = 0
 
 			case 2: // Terceira opção: Voltar ao menu principal
 				m.currentView = constants.DefaultView
@@ -1062,6 +1152,13 @@ func (m *CLIModel) initImportMethodSelection() {
 	m.menuItems = NewImportMenu()
 	m.selectedMenu = 0
 	m.currentView = constants.ImportMethodSelectionView
+}
+
+func (m *CLIModel) initConfigMenu() {
+	// Usar o menu de configuração que inclui a opção de voltar ao menu principal
+	m.menuItems = NewConfigMenu()
+	m.selectedMenu = 0
+	m.currentView = constants.ConfigurationView
 }
 
 func (m *CLIModel) initImportPrivateKey() {
