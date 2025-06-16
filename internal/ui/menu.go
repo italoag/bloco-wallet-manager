@@ -56,6 +56,15 @@ func NewConfigMenu() []menuItem {
 	}
 }
 
+// NewNetworkMenu cria e retorna uma lista de itens do menu de redes
+func NewNetworkMenu() []menuItem {
+	return []menuItem{
+		{title: localization.Labels["add_network"], description: localization.Labels["add_network_desc"]},
+		{title: localization.Labels["network_list"], description: localization.Labels["network_list_desc"]},
+		{title: localization.Labels["back_to_menu"], description: localization.Labels["back_to_menu_desc"]},
+	}
+}
+
 // NewLanguageMenu cria e retorna uma lista de itens do menu de idiomas
 func NewLanguageMenu(cfg *config.Config) []menuItem {
 	// Get the list of available languages

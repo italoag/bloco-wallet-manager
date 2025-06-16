@@ -35,4 +35,8 @@ type CLIModel struct {
 	fontInfo          *tdf.FontInfo    // Informação da fonte selecionada
 	dialogButtonIndex int              // 0 = Confirmar, 1 = Cancelar
 	currentConfig     *config.Config   // Configuração atual da aplicação
+
+	// Network components
+	networkListComponent NetworkListComponent // Componente de lista de redes
+	addNetworkComponent  AddNetworkComponent  // Componente de adição de rede
 }

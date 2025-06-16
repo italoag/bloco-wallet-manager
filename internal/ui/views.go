@@ -113,7 +113,7 @@ func (m *CLIModel) renderSplash() string {
 	renderedLogo := fontString.RenderString("bloco")
 	renderedLogo = strings.TrimSpace(renderedLogo) // Remove any extra whitespace
 
-	projectInfo := fmt.Sprintf("%s v%s", "BLOCO Wallet Manager", localization.Labels["version"])
+	projectInfo := fmt.Sprintf("%s v%s", "BLOCO Wallet", localization.Labels["version"])
 
 	// Center the projectInfo text
 	projectInfoStyled := lipgloss.NewStyle().
@@ -168,6 +168,9 @@ func (m *CLIModel) renderStatusBar() string {
 		constants.WalletDetailsView:         localization.Labels["wallet_details_title"],
 		constants.ConfigurationView:         localization.Labels["configuration"],
 		constants.LanguageSelectionView:     localization.Labels["language"],
+		constants.NetworkMenuView:           localization.Labels["networks"],
+		constants.NetworkListView:           localization.Labels["network_list"],
+		constants.AddNetworkView:            localization.Labels["add_network"],
 	}
 
 	// Get the view name from the map, or use the current view constant if not found
@@ -582,6 +585,17 @@ func (m *CLIModel) viewLanguageSelection() string {
 	}
 
 	// Em vez de renderizar o menu de idiomas novamente, exibir apenas uma mensagem informativa
+	// já que o menu já é exibido na área padrão de menu
+	return localization.Labels["welcome_message"]
+}
+
+// viewNetworkMenu renderiza a visualização do menu de redes
+func (m *CLIModel) viewNetworkMenu() string {
+	if localization.Labels == nil {
+		return "Localization labels not initialized."
+	}
+
+	// Em vez de renderizar o menu de redes novamente, exibir apenas uma mensagem informativa
 	// já que o menu já é exibido na área padrão de menu
 	return localization.Labels["welcome_message"]
 }

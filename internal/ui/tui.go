@@ -326,6 +326,12 @@ func (m *CLIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateConfigMenu(msg)
 	case constants.LanguageSelectionView:
 		return m.updateLanguageSelection(msg)
+	case constants.NetworkMenuView:
+		return m.updateNetworkMenu(msg)
+	case constants.NetworkListView:
+		return m.updateNetworkList(msg)
+	case constants.AddNetworkView:
+		return m.updateAddNetwork(msg)
 	default:
 		m.currentView = constants.DefaultView
 		return m, nil
@@ -607,6 +613,12 @@ func (m *CLIModel) getContentView() string {
 		return m.viewConfigMenu()
 	case constants.LanguageSelectionView:
 		return m.viewLanguageSelection()
+	case constants.NetworkMenuView:
+		return m.viewNetworkMenu()
+	case constants.NetworkListView:
+		return m.viewNetworkList()
+	case constants.AddNetworkView:
+		return m.viewAddNetwork()
 	default:
 		return localization.Labels["unknown_state"]
 	}
@@ -929,11 +941,11 @@ func (m *CLIModel) updateConfigMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Usar o menu de configuração para determinar a ação baseada na seleção
 			switch m.selectedMenu {
 			case 0: // Primeira opção: Redes
-				// Aqui seria implementada a lógica para configurar redes
-				// Por enquanto, apenas volta ao menu principal
-				m.menuItems = NewMenu() // Recarregar o menu principal
-				m.selectedMenu = 0      // Resetar a seleção
-				m.currentView = constants.DefaultView
+				// Mostrar o submenu de redes
+				m.menuItems = NewNetworkMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.NetworkMenuView
+				return m, nil
 
 			case 1: // Segunda opção: Idioma
 				// Implementar a lógica para configurar idioma
@@ -1666,6 +1678,47 @@ func (m *CLIModel) updateLanguageSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.menuItems = NewConfigMenu()
 				m.selectedMenu = 0
 				m.currentView = constants.ConfigurationView
+			}
+		case "esc", "backspace":
+			// Return to the config menu
+			m.menuItems = NewConfigMenu()
+			m.selectedMenu = 0
+			m.currentView = constants.ConfigurationView
+		}
+	}
+	return m, nil
+}
+
+// updateNetworkMenu handles user input in the network menu view
+func (m *CLIModel) updateNetworkMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.selectedMenu > 0 {
+				m.selectedMenu--
+			}
+		case "down", "j":
+			if m.selectedMenu < len(m.menuItems)-1 {
+				m.selectedMenu++
+			}
+		case "enter":
+			// If the last item (Back) is selected, return to the config menu
+			if m.selectedMenu == len(m.menuItems)-1 {
+				m.menuItems = NewConfigMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.ConfigurationView
+				return m, nil
+			}
+
+			// Otherwise, handle the selected option
+			switch m.selectedMenu {
+			case 0: // Add Network
+				m.initAddNetwork()
+				return m, nil
+			case 1: // Network List
+				m.initNetworkList()
+				return m, nil
 			}
 		case "esc", "backspace":
 			// Return to the config menu

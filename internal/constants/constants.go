@@ -19,7 +19,10 @@ const (
 	WalletPasswordView        = "wallet_password"
 	WalletDetailsView         = "wallet_details"
 	ConfigurationView         = "configuration"
+	NetworkMenuView           = "network_menu"
 	LanguageSelectionView     = "language_selection"
+	NetworkListView           = "network_list"
+	AddNetworkView            = "add_network"
 	StyleWidth                = 40
 	StyleMargin               = 1
 	SplashDuration            = 2 * time.Second

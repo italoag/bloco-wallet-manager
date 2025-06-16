@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,7 +79,12 @@ func (s *ChainListService) GetChainInfo(chainID int) (*ChainInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch chain list: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
@@ -118,7 +124,12 @@ func (s *ChainListService) ValidateRPCEndpoint(rpcURL string) error {
 	if err != nil {
 		return fmt.Errorf("RPC endpoint is not accessible: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("RPC endpoint returned status: %d", resp.StatusCode)
@@ -136,7 +147,12 @@ func (s *ChainListService) GetChainIDFromRPC(rpcURL string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to call RPC: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("RPC call failed with status: %d", resp.StatusCode)
@@ -174,30 +190,45 @@ func (s *ChainListService) loadChains() error {
 
 	// Check if cache is still valid (24 hours)
 	if time.Now().Before(s.cacheExpiry) && len(s.chains) > 0 {
+		// Debug log removed
 		return nil
 	}
 
+	// Debug log removed
 	url := fmt.Sprintf("%s/rpcs.json", s.baseURL)
 	resp, err := s.client.Get(url)
 	if err != nil {
+		// Debug log removed
 		return fmt.Errorf("failed to fetch chain list: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			// Debug log removed
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
+		// Debug log removed
 		return fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 	}
 
+	// Debug log removed
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		// Debug log removed
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	// Debug log removed
 	var chains []ChainInfo
 	if err := json.Unmarshal(body, &chains); err != nil {
+		// Debug log removed
 		return fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
+	// Debug log removed
 	s.chains = chains
 	s.cacheExpiry = time.Now().Add(24 * time.Hour)
 	return nil
@@ -251,13 +282,18 @@ func (s *ChainListService) SearchNetworksByName(query string) ([]NetworkSuggesti
 
 // GetChainInfoWithRetry gets chain info and tests RPC endpoints with retry logic
 func (s *ChainListService) GetChainInfoWithRetry(chainID int) (*ChainInfo, string, error) {
+	// Debug log removed
+
 	if err := s.loadChains(); err != nil {
+		// Debug log removed
 		return nil, "", err
 	}
 
 	s.cacheMu.RLock()
 	chains := s.chains
 	s.cacheMu.RUnlock()
+
+	// Debug log removed
 
 	// Find chain by ID
 	var targetChain *ChainInfo
@@ -272,9 +308,16 @@ func (s *ChainListService) GetChainInfoWithRetry(chainID int) (*ChainInfo, strin
 		return nil, "", fmt.Errorf("chain with ID %d not found", chainID)
 	}
 
+
 	// Test RPC endpoints and find the best one
 	workingRPC, err := s.findBestRPCEndpoint(targetChain.RPC, chainID)
 	if err != nil {
+		// Fallback: If we couldn't find a working RPC endpoint, just use the first one in the list
+		if len(targetChain.RPC) > 0 {
+			fallbackRPC := targetChain.RPC[0].URL
+			return targetChain, fallbackRPC, nil
+		}
+
 		return nil, "", fmt.Errorf("no working RPC endpoint found: %w", err)
 	}
 
@@ -287,14 +330,20 @@ func (s *ChainListService) findBestRPCEndpoint(endpoints []RPCEndpoint, expected
 		return "", fmt.Errorf("no RPC endpoints available")
 	}
 
+
 	// Channel to collect results
 	results := make(chan RPCConnectionResult, len(endpoints))
 
+	// Create a timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// Test all endpoints concurrently
-	for _, endpoint := range endpoints {
-		go func(ep RPCEndpoint) {
+	for i, endpoint := range endpoints {
+		go func(idx int, ep RPCEndpoint) {
 			result := RPCConnectionResult{URL: ep.URL}
 			start := time.Now()
+
 
 			chainID, err := s.testRPCEndpoint(ep.URL, expectedChainID)
 			result.Latency = time.Since(start)
@@ -307,20 +356,32 @@ func (s *ChainListService) findBestRPCEndpoint(endpoints []RPCEndpoint, expected
 				result.ChainID = chainID
 			}
 
-			results <- result
-		}(endpoint)
+			select {
+			case results <- result:
+				// Result sent successfully
+			case <-ctx.Done():
+				// Context timed out, no need to send result
+			}
+		}(i, endpoint)
 	}
 
 	// Collect results and find the best one
 	var bestResult *RPCConnectionResult
 
+	// Use a timeout to avoid waiting forever
+	timeout := time.After(10 * time.Second)
+
 	for i := 0; i < len(endpoints); i++ {
-		result := <-results
-		if result.Success && result.ChainID == expectedChainID {
-			// Select the fastest endpoint
-			if bestResult == nil || result.Latency < bestResult.Latency {
-				bestResult = &result
+		select {
+		case result := <-results:
+			if result.Success && result.ChainID == expectedChainID {
+				// Select the fastest endpoint
+				if bestResult == nil || result.Latency < bestResult.Latency {
+					bestResult = &result
+				}
 			}
+		case <-timeout:
+			i = len(endpoints) // Exit the loop
 		}
 	}
 
@@ -337,19 +398,27 @@ func (s *ChainListService) testRPCEndpoint(rpcURL string, expectedChainID int) (
 		return 0, fmt.Errorf("invalid RPC URL")
 	}
 
+
 	// Create a client with shorter timeout for testing
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	reqBody := `{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}`
+
 	resp, err := client.Post(rpcURL, "application/json", strings.NewReader(reqBody))
 	if err != nil {
 		return 0, fmt.Errorf("RPC request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("RPC returned status: %d", resp.StatusCode)
 	}
+
 
 	var result struct {
 		Result string `json:"result"`
@@ -366,6 +435,7 @@ func (s *ChainListService) testRPCEndpoint(rpcURL string, expectedChainID int) (
 	if result.Error != nil {
 		return 0, fmt.Errorf("RPC error: %s", result.Error.Message)
 	}
+
 
 	// Convert hex chain ID to int
 	chainID, err := strconv.ParseInt(result.Result, 0, 64)
