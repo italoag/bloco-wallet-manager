@@ -755,6 +755,13 @@ func (m *CLIModel) updateImportWallet(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.passwordInput.Width = constants.PasswordWidth
 				m.passwordInput.EchoMode = textinput.EchoPassword
 				m.passwordInput.EchoCharacter = '•'
+				m.passwordInput.Validate = func(s string) error {
+					_, isValid := wallet.ValidatePassword(s)
+					if !isValid && s != "" {
+						return fmt.Errorf("")
+					}
+					return nil
+				}
 				m.passwordInput.Focus()
 				m.currentView = constants.ImportWalletPasswordView
 			}
@@ -966,6 +973,13 @@ func (m *CLIModel) updateImportPrivateKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.passwordInput.Width = constants.PasswordWidth
 			m.passwordInput.EchoMode = textinput.EchoPassword
 			m.passwordInput.EchoCharacter = '•'
+			m.passwordInput.Validate = func(s string) error {
+				_, isValid := wallet.ValidatePassword(s)
+				if !isValid && s != "" {
+					return fmt.Errorf("")
+				}
+				return nil
+			}
 			m.passwordInput.Focus()
 			m.currentView = constants.ImportWalletPasswordView
 
@@ -1047,6 +1061,13 @@ func (m *CLIModel) updateImportKeystore(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.passwordInput.Width = constants.PasswordWidth
 			m.passwordInput.EchoMode = textinput.EchoPassword
 			m.passwordInput.EchoCharacter = '•'
+			m.passwordInput.Validate = func(s string) error {
+				_, isValid := wallet.ValidatePassword(s)
+				if !isValid && s != "" {
+					return fmt.Errorf("")
+				}
+				return nil
+			}
 			m.passwordInput.Focus()
 			m.currentView = constants.ImportWalletPasswordView
 
@@ -1378,6 +1399,13 @@ func (m *CLIModel) initCreateWallet() {
 	m.passwordInput.Width = constants.PasswordWidth
 	m.passwordInput.EchoMode = textinput.EchoPassword
 	m.passwordInput.EchoCharacter = '•'
+	m.passwordInput.Validate = func(s string) error {
+		_, isValid := wallet.ValidatePassword(s)
+		if !isValid && s != "" {
+			return fmt.Errorf("")
+		}
+		return nil
+	}
 }
 
 func (m *CLIModel) initImportMethodSelection() {
@@ -1516,6 +1544,13 @@ func (m *CLIModel) initWalletPassword() {
 	m.passwordInput.Width = constants.PasswordWidth
 	m.passwordInput.EchoMode = textinput.EchoPassword
 	m.passwordInput.EchoCharacter = '•'
+	m.passwordInput.Validate = func(s string) error {
+		_, isValid := wallet.ValidatePassword(s)
+		if !isValid && s != "" {
+			return fmt.Errorf("")
+		}
+		return nil
+	}
 	m.passwordInput.Focus()
 	m.currentView = constants.WalletPasswordView
 }

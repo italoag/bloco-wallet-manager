@@ -25,6 +25,8 @@ type Styles struct {
 	Dialog             lipgloss.Style
 	DialogButton       lipgloss.Style
 	DialogButtonActive lipgloss.Style
+	GreenCheck         lipgloss.Style
+	RedCross           lipgloss.Style
 }
 
 func createStyles() Styles {
@@ -114,5 +116,9 @@ func createStyles() Styles {
 			Background(lipgloss.Color("#7D56F4")).
 			Border(lipgloss.HiddenBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")),
+		GreenCheck: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("70")),
+		RedCross: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("1")),
 	}
 }

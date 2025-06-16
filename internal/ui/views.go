@@ -2,6 +2,7 @@ package ui
 
 import (
 	"blocowallet/internal/constants"
+	"blocowallet/internal/wallet"
 	"blocowallet/pkg/localization"
 	"bytes"
 	"fmt"
@@ -31,6 +32,54 @@ func (m *CLIModel) viewCreateWalletName() string {
 	return view.String()
 }
 
+// renderPasswordValidation renders the password validation status
+func (m *CLIModel) renderPasswordValidation(password string) string {
+	validationErr, _ := wallet.ValidatePassword(password)
+
+	var builder strings.Builder
+
+	// Check for minimum length
+	if password == "" {
+		builder.WriteString(m.styles.RedCross.Render("✗"))
+		builder.WriteString(" required\n")
+	} else if validationErr.TooShort {
+		builder.WriteString(m.styles.RedCross.Render("✗"))
+		builder.WriteString(" has 8 characters or more\n")
+	} else {
+		builder.WriteString(m.styles.GreenCheck.Render("✓"))
+		builder.WriteString(" has 8 characters or more\n")
+	}
+
+	// Check for lowercase letter
+	if password == "" || validationErr.NoLowercase {
+		builder.WriteString(m.styles.RedCross.Render("✗"))
+		builder.WriteString(" has a lowercase letter\n")
+	} else {
+		builder.WriteString(m.styles.GreenCheck.Render("✓"))
+		builder.WriteString(" has a lowercase letter\n")
+	}
+
+	// Check for uppercase letter
+	if password == "" || validationErr.NoUppercase {
+		builder.WriteString(m.styles.RedCross.Render("✗"))
+		builder.WriteString(" has an uppercase letter\n")
+	} else {
+		builder.WriteString(m.styles.GreenCheck.Render("✓"))
+		builder.WriteString(" has an uppercase letter\n")
+	}
+
+	// Check for digit or special character
+	if password == "" || validationErr.NoDigitOrSpecial {
+		builder.WriteString(m.styles.RedCross.Render("✗"))
+		builder.WriteString(" has a digit or special character")
+	} else {
+		builder.WriteString(m.styles.GreenCheck.Render("✓"))
+		builder.WriteString(" has a digit or special character")
+	}
+
+	return builder.String()
+}
+
 // viewCreateWalletPassword renderiza a visualização de criação de wallet
 func (m *CLIModel) viewCreateWalletPassword() string {
 	if localization.Labels == nil {
@@ -43,6 +92,7 @@ func (m *CLIModel) viewCreateWalletPassword() string {
 			fmt.Sprintf("%s\n\n", m.mnemonic) +
 			localization.Labels["enter_password"] + "\n\n" +
 			m.passwordInput.View() + "\n\n" +
+			m.renderPasswordValidation(m.passwordInput.Value()) + "\n\n" +
 			localization.Labels["press_enter"],
 	)
 	return view.String()
@@ -292,6 +342,7 @@ func (m *CLIModel) viewImportWalletPassword() string {
 	view.WriteString(
 		lipgloss.NewStyle().Bold(true).Render(localization.Labels["enter_password"]+"\n\n") +
 			m.passwordInput.View() + "\n\n" +
+			m.renderPasswordValidation(m.passwordInput.Value()) + "\n\n" +
 			localization.Labels["press_enter"],
 	)
 	return view.String()
@@ -497,6 +548,7 @@ func (m *CLIModel) viewWalletPassword() string {
 	view.WriteString(
 		lipgloss.NewStyle().Bold(true).Render(localization.Labels["enter_wallet_password"]+"\n\n") +
 			m.passwordInput.View() + "\n\n" +
+			m.renderPasswordValidation(m.passwordInput.Value()) + "\n\n" +
 			localization.Labels["press_enter"],
 	)
 	return view.String()
