@@ -818,11 +818,11 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 
 			// Check which import method we're using
-			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
+			if m.currentView == constants.ImportWalletPasswordView && (len(m.privateKeyInput.Value()) >= 64 && len(m.privateKeyInput.Value()) <= 66) {
 				// Import from private key
 				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
 				walletDetails, err = m.Service.ImportWalletFromPrivateKey(name, privateKey, password)
-			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+			} else if strings.Contains(m.mnemonic, "/") {
 				// Import from keystore file
 				keystorePath := m.mnemonic // We stored the keystore path in the mnemonic field
 				walletDetails, err = m.Service.ImportWalletFromKeystore(name, keystorePath, password)

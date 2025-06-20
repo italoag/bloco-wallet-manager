@@ -133,6 +133,7 @@ func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletD
 }
 
 func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, password string) (*WalletDetails, error) {
+	// Return wallet details
 	// Remove "0x" prefix if present
 	if len(privateKeyHex) > 2 && privateKeyHex[:2] == "0x" {
 		privateKeyHex = privateKeyHex[2:]
@@ -199,6 +200,8 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 
 func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password string) (*WalletDetails, error) {
 	// Read the keystore file
+	// Return wallet details
+	
 	keyJSON, err := os.ReadFile(keystorePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading the keystore file: %v", err)
@@ -206,6 +209,8 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 
 	// Decrypt the keystore file to verify the password and extract the address
 	key, err := keystore.DecryptKey(keyJSON, password)
+
+
 	if err != nil {
 		return nil, fmt.Errorf("incorrect password for keystore file")
 	}
