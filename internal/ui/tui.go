@@ -7,19 +7,21 @@ import (
 	"blocowallet/pkg/localization"
 	"bytes"
 	"fmt"
-	"github.com/arsham/figurine/figurine"
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/digitallyserviced/tdfgo/tdf"
-	"github.com/go-errors/errors"
 	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/arsham/figurine/figurine"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/digitallyserviced/tdfgo/tdf"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/go-errors/errors"
 )
 
 // Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
@@ -817,12 +819,13 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				name = "Imported Mnemonic Wallet"
 			}
 
+
 			// Check which import method we're using
-			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
+			if m.currentView == constants.ImportWalletPasswordView && (len(m.privateKeyInput.Value()) == 64 || len(m.privateKeyInput.Value()) == 66 && strings.HasPrefix(m.privateKeyInput.Value(), "0x")) {
 				// Import from private key
 				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
 				walletDetails, err = m.Service.ImportWalletFromPrivateKey(name, privateKey, password)
-			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+			} else if strings.Contains(m.mnemonic, string(filepath.Separator)) || filepath.IsAbs(m.mnemonic) {
 				// Import from keystore file
 				keystorePath := m.mnemonic // We stored the keystore path in the mnemonic field
 				walletDetails, err = m.Service.ImportWalletFromKeystore(name, keystorePath, password)
@@ -837,8 +840,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				log.Println(m.err.(*errors.Error).ErrorStack())
 
 				// If it's a password error for keystore, stay on the password screen
-				if strings.Contains(err.Error(), "incorrect password for keystore") {
-					// Just show the error and stay on the password screen
+				if errors.Is(err, keystore.ErrDecrypt) {
 					return m, nil
 				}
 
@@ -1503,8 +1505,8 @@ func (m *CLIModel) initListWallets() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
@@ -1796,8 +1798,8 @@ func (m *CLIModel) rebuildWalletsTable() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
