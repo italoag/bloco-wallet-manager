@@ -12,61 +12,61 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// CryptoService fornece funcionalidades de criptografia para dados sensíveis
+// CryptoService provides cryptographic functionality for sensitive data
 type CryptoService struct {
 	config *config.Config
 }
 
-// NewCryptoService cria uma nova instância do serviço de criptografia
+// NewCryptoService creates a new instance of the cryptography service
 func NewCryptoService(cfg *config.Config) *CryptoService {
 	return &CryptoService{
 		config: cfg,
 	}
 }
 
-// EncryptMnemonic criptografa uma frase mnemônica usando Argon2ID
+// EncryptMnemonic encrypts a mnemonic phrase using Argon2ID
 func (cs *CryptoService) EncryptMnemonic(mnemonic, password string) (string, error) {
 	if password == "" {
 		return "", fmt.Errorf(localization.Get("error_empty_password"))
 	}
 
-	// Obter configurações do Argon2id
+	// Get Argon2id configurations
 	saltLength := int(cs.config.Security.SaltLength)
 	argon2IDTime := cs.config.Security.Argon2Time
 	argon2IDMemory := cs.config.Security.Argon2Memory
 	argon2IDThreads := cs.config.Security.Argon2Threads
 	argon2IDKeyLen := cs.config.Security.Argon2KeyLen
 
-	// Gerar salt aleatório
+	// Generate random salt
 	salt := make([]byte, saltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf(localization.Get("error_generate_salt")+": %w", err)
 	}
 
-	// Derivar chave usando Argon2ID
+	// Derive key using Argon2ID
 	key := argon2.IDKey([]byte(password), salt, argon2IDTime, argon2IDMemory, argon2IDThreads, argon2IDKeyLen)
 
-	// Criar hash de verificação da mnemônica original + senha
-	// Isso garante que mesmo mnemônicas vazias tenham hashes únicos por senha
+	// Create a verification hash of the original mnemonic + password
+	// This ensures that even empty mnemonics have unique hashes per password
 	mnemonicBytes := []byte(mnemonic)
 	hashInput := append(mnemonicBytes, []byte(password)...)
 	hash := sha256.Sum256(hashInput)
 
-	// Criptografar a mnemônica com XOR
+	// Encrypt the mnemonic with XOR
 	encrypted := make([]byte, len(mnemonicBytes))
 
-	// Repetir a chave se a mnemônica for maior que a chave
+	// Repeat the key if the mnemonic is longer than the key
 	for i := 0; i < len(mnemonicBytes); i++ {
 		encrypted[i] = mnemonicBytes[i] ^ key[i%len(key)]
 	}
 
-	// Combinar salt + hash + dados criptografados e codificar para base64
+	// Combine salt + hash + encrypted data and encode to base64
 	combined := append(salt, hash[:]...)
 	combined = append(combined, encrypted...)
 	return base64.StdEncoding.EncodeToString(combined), nil
 }
 
-// DecryptMnemonic descriptografa uma mnemônica usando Argon2ID
+// DecryptMnemonic decrypts a mnemonic using Argon2ID
 func (cs *CryptoService) DecryptMnemonic(encryptedMnemonic, password string) (string, error) {
 	if encryptedMnemonic == "" {
 		return "", fmt.Errorf(localization.Get("error_empty_encrypted_mnemonic"))

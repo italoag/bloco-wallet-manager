@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"blocowallet/pkg/localization"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -12,26 +13,26 @@ import (
 	"path/filepath"
 )
 
-type WalletDetails struct {
+type Details struct {
 	Wallet     *Wallet
 	Mnemonic   string
 	PrivateKey *ecdsa.PrivateKey
 	PublicKey  *ecdsa.PublicKey
 }
 
-type WalletService struct {
-	Repo     WalletRepository
+type Service struct {
+	Repo     Repository
 	KeyStore *keystore.KeyStore
 }
 
-func NewWalletService(repo WalletRepository, ks *keystore.KeyStore) *WalletService {
-	return &WalletService{
+func NewWalletService(repo Repository, ks *keystore.KeyStore) *Service {
+	return &Service{
 		Repo:     repo,
 		KeyStore: ks,
 	}
 }
 
-func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, error) {
+func (ws *Service) CreateWallet(name, password string) (*Details, error) {
 	mnemonic, err := GenerateMnemonic()
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, er
 	newPath := filepath.Join(filepath.Dir(originalPath), newFilename)
 	err = os.Rename(originalPath, newPath)
 	if err != nil {
-		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_renaming_wallet_file", map[string]interface{}{"v": err}))
 	}
 
 	wallet := &Wallet{
@@ -72,7 +73,7 @@ func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, er
 		return nil, err
 	}
 
-	walletDetails := &WalletDetails{
+	walletDetails := &Details{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
 		PrivateKey: privKey,
@@ -82,9 +83,9 @@ func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, er
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletDetails, error) {
+func (ws *Service) ImportWallet(name, mnemonic, password string) (*Details, error) {
 	if !bip39.IsMnemonicValid(mnemonic) {
-		return nil, fmt.Errorf("invalid mnemonic phrase")
+		return nil, fmt.Errorf(localization.T("error_invalid_mnemonic_phrase", nil))
 	}
 
 	privateKeyHex, err := DerivePrivateKey(mnemonic)
@@ -107,7 +108,7 @@ func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletD
 	newPath := filepath.Join(filepath.Dir(originalPath), newFilename)
 	err = os.Rename(originalPath, newPath)
 	if err != nil {
-		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_renaming_wallet_file", map[string]interface{}{"v": err}))
 	}
 
 	wallet := &Wallet{
@@ -122,7 +123,7 @@ func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletD
 		return nil, err
 	}
 
-	walletDetails := &WalletDetails{
+	walletDetails := &Details{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
 		PrivateKey: privKey,
@@ -132,44 +133,44 @@ func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletD
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, password string) (*WalletDetails, error) {
+func (ws *Service) ImportWalletFromPrivateKey(name, privateKeyHex, password string) (*Details, error) {
 	// Remove "0x" prefix if present
 	if len(privateKeyHex) > 2 && privateKeyHex[:2] == "0x" {
 		privateKeyHex = privateKeyHex[2:]
 	}
 
-	// Validate private key format
+	// Validate a private key format
 	if len(privateKeyHex) != 64 {
-		return nil, fmt.Errorf("invalid private key format")
+		return nil, fmt.Errorf(localization.T("error_invalid_private_key_format", nil))
 	}
 
 	// Convert hex to ECDSA private key
 	privKey, err := HexToECDSA(privateKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("invalid private key: %v", err)
+		return nil, fmt.Errorf(localization.T("error_invalid_private_key", map[string]interface{}{"v": err}))
 	}
 
-	// Generate a mnemonic from private key
+	// Generate a mnemonic from a private key
 	privateKeyBytes, _ := hex.DecodeString(privateKeyHex)
 	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
 	mnemonic, err := bip39.NewMnemonic(entropy)
 	if err != nil {
-		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+		return nil, fmt.Errorf(localization.T("error_generating_mnemonic", map[string]interface{}{"v": err}))
 	}
 
-	// Import the private key to keystore
+	// Import the private key to the keystore
 	account, err := ws.KeyStore.ImportECDSA(privKey, password)
 	if err != nil {
 		return nil, err
 	}
 
-	// Rename the keystore file to match Ethereum address
+	// Rename the keystore file to match the Ethereum address
 	originalPath := account.URL.Path
 	newFilename := fmt.Sprintf("%s.json", account.Address.Hex())
 	newPath := filepath.Join(filepath.Dir(originalPath), newFilename)
 	err = os.Rename(originalPath, newPath)
 	if err != nil {
-		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_renaming_wallet_file", map[string]interface{}{"v": err}))
 	}
 
 	// Create the wallet entry with the generated mnemonic
@@ -187,7 +188,7 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 	}
 
 	// Return wallet details with the generated mnemonic
-	walletDetails := &WalletDetails{
+	walletDetails := &Details{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
 		PrivateKey: privKey,
@@ -197,24 +198,24 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password string) (*WalletDetails, error) {
+func (ws *Service) ImportWalletFromKeystore(name, keystorePath, password string) (*Details, error) {
 	// Read the keystore file
 	keyJSON, err := os.ReadFile(keystorePath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading the keystore file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_reading_keystore_file", map[string]interface{}{"v": err}))
 	}
 
 	// Decrypt the keystore file to verify the password and extract the address
 	key, err := keystore.DecryptKey(keyJSON, password)
 	if err != nil {
-		return nil, fmt.Errorf("incorrect password for keystore file")
+		return nil, fmt.Errorf(localization.T("error_incorrect_keystore_password", nil))
 	}
 
 	// Get the address from the key
 	address := key.Address.Hex()
 
 	// Create the destination filename with 0x prefix
-	destFilename := fmt.Sprintf("0x%s.json", address[2:]) // Remove "0x" prefix if present and add it back
+	destFilename := fmt.Sprintf("0x%s.json", address[2:]) // Remove the "0x" prefix if present and add it back
 
 	// Get the keystore directory
 	var keystoreDir string
@@ -228,7 +229,7 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 		// If there are no accounts, use a default path
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, fmt.Errorf("error getting user home directory: %v", err)
+			return nil, fmt.Errorf(localization.T("error_getting_home_directory", map[string]interface{}{"v": err}))
 		}
 		keystoreDir = filepath.Join(homeDir, ".wallets", "keystore")
 	}
@@ -239,22 +240,27 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 	// Copy the keystore file to the destination
 	destFile, err := os.Create(destPath)
 	if err != nil {
-		return nil, fmt.Errorf("error creating destination file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_creating_destination_file", map[string]interface{}{"v": err}))
 	}
-	defer destFile.Close()
+	defer func(destFile *os.File) {
+		err := destFile.Close()
+		if err != nil {
+			fmt.Printf(localization.T("error_writing_destination_file", map[string]interface{}{"v": err}))
+		}
+	}(destFile)
 
 	// Write the keystore JSON to the destination file
 	_, err = destFile.Write(keyJSON)
 	if err != nil {
-		return nil, fmt.Errorf("error writing to destination file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_writing_destination_file", map[string]interface{}{"v": err}))
 	}
 
-	// Generate a mnemonic from private key (for compatibility with the rest of the app)
+	// Generate a mnemonic from a private key (for compatibility with the rest of the app)
 	privateKeyBytes := crypto.FromECDSA(key.PrivateKey)
 	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
 	mnemonic, err := bip39.NewMnemonic(entropy)
 	if err != nil {
-		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+		return nil, fmt.Errorf(localization.T("error_generating_mnemonic", map[string]interface{}{"v": err}))
 	}
 
 	// Create the wallet entry
@@ -272,7 +278,7 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 	}
 
 	// Return wallet details
-	walletDetails := &WalletDetails{
+	walletDetails := &Details{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
 		PrivateKey: key.PrivateKey,
@@ -282,17 +288,17 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 	return walletDetails, nil
 }
 
-func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDetails, error) {
+func (ws *Service) LoadWallet(wallet *Wallet, password string) (*Details, error) {
 	keyJSON, err := os.ReadFile(wallet.KeyStorePath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading the wallet file: %v", err)
+		return nil, fmt.Errorf(localization.T("error_reading_wallet_file", map[string]interface{}{"v": err}))
 	}
 	key, err := keystore.DecryptKey(keyJSON, password)
 	if err != nil {
-		return nil, fmt.Errorf("incorrect password")
+		return nil, fmt.Errorf(localization.T("error_incorrect_password", nil))
 	}
 
-	walletDetails := &WalletDetails{
+	walletDetails := &Details{
 		Wallet:     wallet,
 		Mnemonic:   wallet.Mnemonic,
 		PrivateKey: key.PrivateKey,
@@ -301,17 +307,17 @@ func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDet
 	return walletDetails, nil
 }
 
-func (ws *WalletService) GetAllWallets() ([]Wallet, error) {
+func (ws *Service) GetAllWallets() ([]Wallet, error) {
 	return ws.Repo.GetAllWallets()
 }
 
-func (ws *WalletService) DeleteWallet(wallet *Wallet) error {
-	// Remove o arquivo keystore do sistema
+func (ws *Service) DeleteWallet(wallet *Wallet) error {
+	// Remove the keystore file from the system
 	err := os.Remove(wallet.KeyStorePath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove keystore file: %v", err)
+		return fmt.Errorf(localization.T("error_remove_keystore_file", map[string]interface{}{"v": err}))
 	}
-	// Remove do banco de dados
+	// Remove from the database
 	return ws.Repo.DeleteWallet(wallet.ID)
 }
 
@@ -331,7 +337,7 @@ func GenerateMnemonic() (string, error) {
 
 func DerivePrivateKey(mnemonic string) (string, error) {
 	if !bip39.IsMnemonicValid(mnemonic) {
-		return "", fmt.Errorf("invalid mnemonic phrase")
+		return "", fmt.Errorf(localization.T("error_invalid_mnemonic_phrase", nil))
 	}
 	seed := bip39.NewSeed(mnemonic, "")
 	masterKey, err := bip32.NewMasterKey(seed)

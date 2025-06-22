@@ -12,7 +12,7 @@ type walletCountMsg struct {
 }
 
 // Comando para buscar wallets e retornar a contagem
-func walletCountCmd(service *wallet.WalletService) tea.Cmd {
+func walletCountCmd(service *wallet.Service) tea.Cmd {
 	return func() tea.Msg {
 		wallets, err := service.GetAllWallets()
 		if err != nil {

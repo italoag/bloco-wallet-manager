@@ -9,7 +9,7 @@ import (
 )
 
 type CLIModel struct {
-	Service           *wallet.WalletService
+	Service           *wallet.Service
 	currentView       string
 	menuItems         []menuItem
 	selectedMenu      int
@@ -28,7 +28,7 @@ type CLIModel struct {
 	walletTable       table.Model
 	width             int
 	height            int
-	walletDetails     *wallet.WalletDetails
+	walletDetails     *wallet.Details
 	styles            Styles
 	fontsList         []string         // Lista de nomes de fontes carregadas do arquivo externo
 	selectedFont      *tdf.TheDrawFont // Fonte selecionada aleatoriamente

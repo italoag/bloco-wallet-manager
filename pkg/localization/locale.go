@@ -112,26 +112,58 @@ func createLanguageFile(filePath, lang string) error {
 	switch lang {
 	case "en":
 		messages = getEnglishMessages()
-		// Adicionar mensagens de criptografia
+		// Add crypto messages
 		for k, v := range DefaultCryptoMessages() {
+			messages[k] = v
+		}
+		// Add wallet messages
+		for k, v := range DefaultWalletMessages() {
+			messages[k] = v
+		}
+		// Add blockchain messages
+		for k, v := range DefaultBlockchainMessages() {
 			messages[k] = v
 		}
 	case "pt":
 		messages = getPortugueseMessages()
-		// Adicionar mensagens de criptografia
+		// Add crypto messages
 		for k, v := range DefaultCryptoMessagesPortuguese() {
+			messages[k] = v
+		}
+		// Add wallet messages
+		for k, v := range DefaultWalletMessagesPortuguese() {
+			messages[k] = v
+		}
+		// Add blockchain messages
+		for k, v := range DefaultBlockchainMessagesPortuguese() {
 			messages[k] = v
 		}
 	case "es":
 		messages = getSpanishMessages()
-		// Adicionar mensagens de criptografia
+		// Add crypto messages
 		for k, v := range DefaultCryptoMessagesSpanish() {
+			messages[k] = v
+		}
+		// Add wallet messages
+		for k, v := range DefaultWalletMessagesSpanish() {
+			messages[k] = v
+		}
+		// Add blockchain messages
+		for k, v := range DefaultBlockchainMessagesSpanish() {
 			messages[k] = v
 		}
 	default:
 		messages = getEnglishMessages()
-		// Adicionar mensagens de criptografia padrão (inglês)
+		// Add default crypto messages (English)
 		for k, v := range DefaultCryptoMessages() {
+			messages[k] = v
+		}
+		// Add default wallet messages (English)
+		for k, v := range DefaultWalletMessages() {
+			messages[k] = v
+		}
+		// Add default blockchain messages (English)
+		for k, v := range DefaultBlockchainMessages() {
 			messages[k] = v
 		}
 	}
@@ -517,17 +549,17 @@ func getSpanishMessages() map[string]string {
 	}
 }
 
-// populateLabelsMap preenche o mapa Labels com os valores traduzidos para compatibilidade retroativa
+// populateLabelsMap populates the Labels map with translated values for backward compatibility.
 func populateLabelsMap() error {
-	// Inicializa o mapa global se ainda não estiver inicializado
+	// Initialize the global map if it's not already initialized
 	if Labels == nil {
 		Labels = make(map[string]string)
 	}
 
-	// Obtém todas as mensagens disponíveis usando o localizer
+	// Get all available messages using the localizer
 	messageKeys := getAllMessageKeys()
 
-	// Adiciona cada mensagem ao mapa Labels
+	// Add each message to the Labels map
 	for _, key := range messageKeys {
 		localizedString := Get(key)
 		Labels[key] = localizedString
@@ -536,22 +568,22 @@ func populateLabelsMap() error {
 	return nil
 }
 
-// getAllMessageKeys retorna todas as chaves de mensagem conhecidas
+// getAllMessageKeys returns all known message keys.
 func getAllMessageKeys() []string {
-	// Combine as chaves de todos os idiomas para garantir que todas estejam presentes
+	// Combine keys from all languages to ensure all are present
 	keysMap := make(map[string]bool)
 
-	// Adiciona chaves em inglês
+	// Add English keys
 	for key := range getEnglishMessages() {
 		keysMap[key] = true
 	}
 
-	// Adiciona chaves de criptografia
+	// Add crypto keys
 	for key := range DefaultCryptoMessages() {
 		keysMap[key] = true
 	}
 
-	// Converte o mapa em uma lista de chaves
+	// Convert the map to a list of keys
 	keys := make([]string, 0, len(keysMap))
 	for key := range keysMap {
 		keys = append(keys, key)
@@ -560,19 +592,19 @@ func getAllMessageKeys() []string {
 	return keys
 }
 
-// Get retorna a mensagem localizada para a chave especificada
+// Get returns the localized message for the specified key.
 func Get(key string) string {
 	if localizer == nil {
-		return key // Retorna a própria chave se o localizer não estiver inicializado
+		return key // Return the key itself if the localizer is not initialized
 	}
 
-	// Obtém a mensagem traduzida
+	// Get the translated message
 	msg, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: key,
 	})
 
 	if err != nil {
-		return key // Retorna a própria chave se não houver tradução
+		return key // Return the key itself if there is no translation
 	}
 
 	return msg

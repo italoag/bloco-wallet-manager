@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"blocowallet/pkg/config"
+	"blocowallet/pkg/localization"
 )
 
 // MultiProvider manages multiple balance providers for different networks
@@ -23,7 +24,7 @@ type Provider struct {
 	network         config.Network
 }
 
-// BalanceProvider is interface implemented by Ethereum, Mock, etc.
+// BalanceProvider is an interface implemented by Ethereum, Mock, etc.
 type BalanceProvider interface {
 	GetBalance(ctx context.Context, address string) (*big.Int, error)
 	GetNetworkSymbol() string
@@ -97,7 +98,10 @@ func (mp *MultiProvider) GetAllBalances(ctx context.Context, address string) []N
 
 		amount, err := provider.balanceProvider.GetBalance(ctx, address)
 		if err != nil {
-			balance.Error = fmt.Errorf("failed to get balance on %s: %w", provider.network.Name, err)
+			balance.Error = fmt.Errorf(localization.T("error_failed_get_balance", map[string]interface{}{
+				"s": provider.network.Name,
+				"v": err,
+			}))
 		} else {
 			balance.Amount = amount
 		}

@@ -2,7 +2,7 @@ package wallet
 
 import "time"
 
-// Wallet representa uma carteira de criptomoeda
+// Wallet represents a cryptocurrency wallet
 type Wallet struct {
 	ID           int       `gorm:"primaryKey"`
 	Name         string    `gorm:"not null"`
@@ -12,7 +12,7 @@ type Wallet struct {
 	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
 }
 
-// TableName define o nome da tabela no banco de dados
+// TableName defines the table name in the database
 func (Wallet) TableName() string {
 	return "wallets"
 }

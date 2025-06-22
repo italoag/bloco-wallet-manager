@@ -126,7 +126,7 @@ func closeFile(file *os.File) {
 	}
 }
 
-func closeResource(repo wallet.WalletRepository) {
+func closeResource(repo wallet.Repository) {
 	if err := repo.Close(); err != nil {
 		log.Printf("Erro ao fechar o banco de dados: %v\n", err)
 	}

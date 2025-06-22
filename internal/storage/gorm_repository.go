@@ -13,15 +13,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// GORMRepository implementa a interface WalletRepository usando GORM
+// GORMRepository implements the Repository interface using GORM
 type GORMRepository struct {
 	db *gorm.DB
 }
 
-// Garantimos que GORMRepository implementa a interface WalletRepository
-var _ wallet.WalletRepository = &GORMRepository{}
+// Ensure that GORMRepository implements the Repository interface
+var _ wallet.Repository = &GORMRepository{}
 
-// NewWalletRepository cria uma nova instância de GORMRepository com base na configuração
+// NewWalletRepository creates a new instance of GORMRepository based on the configuration
 func NewWalletRepository(cfg *config.Config) (*GORMRepository, error) {
 	var dialector gorm.Dialector
 
@@ -29,70 +29,70 @@ func NewWalletRepository(cfg *config.Config) (*GORMRepository, error) {
 	case "postgres":
 		dsn := cfg.Database.DSN
 		if dsn == "" {
-			return nil, fmt.Errorf("configuração DSN vazia para PostgreSQL")
+			return nil, fmt.Errorf("empty DSN configuration for PostgreSQL")
 		}
 		dialector = postgres.Open(dsn)
 	case "mysql":
 		dsn := cfg.Database.DSN
 		if dsn == "" {
-			return nil, fmt.Errorf("configuração DSN vazia para MySQL")
+			return nil, fmt.Errorf("empty DSN configuration for MySQL")
 		}
 		dialector = mysql.Open(dsn)
 	case "sqlite", "":
-		// Usar SQLite por padrão
+		// Use SQLite by default
 		dbPath := cfg.DatabasePath
 		if cfg.Database.DSN != "" {
 			dbPath = cfg.Database.DSN
 		}
 
-		// Garantir que o diretório existe
+		// Ensure the directory exists
 		dir := filepath.Dir(dbPath)
 		if err := ensureDir(dir); err != nil {
-			return nil, fmt.Errorf("falha ao criar diretório para o banco de dados: %w", err)
+			return nil, fmt.Errorf("failed to create directory for database: %w", err)
 		}
 
 		dialector = sqlite.Open(dbPath)
 	default:
-		return nil, fmt.Errorf("tipo de banco de dados não suportado: %s", cfg.Database.Type)
+		return nil, fmt.Errorf("unsupported database type: %s", cfg.Database.Type)
 	}
 
 	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("falha ao conectar ao banco de dados: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Auto Migrate cria a tabela se não existir
+	// Auto Migrate creates the table if it doesn't exist
 	err = db.AutoMigrate(&wallet.Wallet{})
 	if err != nil {
-		return nil, fmt.Errorf("falha ao migrar tabela de carteiras: %w", err)
+		return nil, fmt.Errorf("failed to migrate wallets table: %w", err)
 	}
 
 	return &GORMRepository{db: db}, nil
 }
 
-// ensureDir garante que o diretório existe
+// ensureDir ensures that the directory exists
 func ensureDir(dir string) error {
 	return os.MkdirAll(dir, os.ModePerm)
 }
 
-// AddWallet adiciona uma nova carteira ao banco de dados
+// AddWallet adds a new wallet to the database
 func (repo *GORMRepository) AddWallet(wallet *wallet.Wallet) error {
 	return repo.db.Create(wallet).Error
 }
 
-// GetAllWallets retorna todas as carteiras salvas
+// GetAllWallets returns all saved wallets
 func (repo *GORMRepository) GetAllWallets() ([]wallet.Wallet, error) {
 	var wallets []wallet.Wallet
 	result := repo.db.Find(&wallets)
 	return wallets, result.Error
 }
 
-// DeleteWallet remove uma carteira pelo ID
+// DeleteWallet removes a wallet by ID
 func (repo *GORMRepository) DeleteWallet(walletID int) error {
 	return repo.db.Delete(&wallet.Wallet{}, walletID).Error
 }
 
-// Close fecha a conexão com o banco de dados
+// Close closes the database connection
 func (repo *GORMRepository) Close() error {
 	sqlDB, err := repo.db.DB()
 	if err != nil {

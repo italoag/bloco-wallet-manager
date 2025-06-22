@@ -56,7 +56,7 @@ func buildFontsList(customFontDir string) []*tdf.FontInfo {
 
 type splashMsg struct{}
 
-func NewCLIModel(service *wallet.WalletService) *CLIModel {
+func NewCLIModel(service *wallet.Service) *CLIModel {
 	model := &CLIModel{
 		Service:      service,
 		currentView:  constants.SplashView,
@@ -803,7 +803,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				return m, nil
 			}
 
-			var walletDetails *wallet.WalletDetails
+			var walletDetails *wallet.Details
 			var err error
 
 			// Use a default name based on the import method
@@ -1503,8 +1503,8 @@ func (m *CLIModel) initListWallets() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
@@ -1796,8 +1796,8 @@ func (m *CLIModel) rebuildWalletsTable() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
