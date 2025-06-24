@@ -3,6 +3,8 @@ package wallet
 import (
 	"blocowallet/pkg/config"
 	"blocowallet/pkg/localization"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -52,16 +54,27 @@ func (cs *CryptoService) EncryptMnemonic(mnemonic, password string) (string, err
 	hashInput := append(mnemonicBytes, []byte(password)...)
 	hash := sha256.Sum256(hashInput)
 
-	// Encrypt the mnemonic with XOR
-	encrypted := make([]byte, len(mnemonicBytes))
-
-	// Repeat the key if the mnemonic is longer than the key
-	for i := 0; i < len(mnemonicBytes); i++ {
-		encrypted[i] = mnemonicBytes[i] ^ key[i%len(key)]
+	// Encrypt the mnemonic using AES-GCM
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
 
-	// Combine salt + hash + encrypted data and encode to base64
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create AEAD: %w", err)
+	}
+
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	encrypted := aead.Seal(nil, nonce, mnemonicBytes, nil)
+
+	// Combine salt + hash + nonce + encrypted data and encode to base64
 	combined := append(salt, hash[:]...)
+	combined = append(combined, nonce...)
 	combined = append(combined, encrypted...)
 	return base64.StdEncoding.EncodeToString(combined), nil
 }
@@ -104,10 +117,25 @@ func (cs *CryptoService) DecryptMnemonic(encryptedMnemonic, password string) (st
 		cs.config.Security.Argon2KeyLen,
 	)
 
-	// Descriptografar a mnemônica com XOR
-	decrypted := make([]byte, len(encrypted))
-	for i := 0; i < len(encrypted); i++ {
-		decrypted[i] = encrypted[i] ^ key[i%len(key)]
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create AEAD: %w", err)
+	}
+
+	if len(encrypted) < aead.NonceSize() {
+		return "", fmt.Errorf(localization.Get("error_invalid_mnemonic_format"))
+	}
+
+	nonce := encrypted[:aead.NonceSize()]
+	cipherText := encrypted[aead.NonceSize():]
+
+	decrypted, err := aead.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return "", fmt.Errorf(localization.Get("error_invalid_password"))
 	}
 
 	// Verificar o hash para garantir que a senha está correta

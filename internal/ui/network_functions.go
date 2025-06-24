@@ -151,6 +151,9 @@ func (m *CLIModel) updateNetworkList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Remove the network from the configuration
 			delete(m.currentConfig.Networks, key)
 
+			// Persist the updated configuration
+			_ = config.SaveConfig(m.currentConfig)
+
 			// Update the network list
 			m.networkListComponent.UpdateNetworks(m.currentConfig)
 
@@ -251,6 +254,9 @@ func (m *CLIModel) updateAddNetwork(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Symbol:      msg.Symbol,
 			IsActive:    true,
 		}
+
+		// Persist the updated configuration
+		_ = config.SaveConfig(m.currentConfig)
 
 		// Initialize the network list component if it hasn't been initialized yet
 		if m.networkListComponent.table.Rows() == nil {
