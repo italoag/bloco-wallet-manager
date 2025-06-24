@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -63,16 +62,16 @@ func main() {
 
 	// Set version from build info
 	if info, ok := debug.ReadBuildInfo(); ok {
-		version := "0.1.0" // Default version if not found
+		version := info.Main.Version
+		if version == "" || version == "(devel)" {
+			version = "0.1.0"
+		}
 
-		// Try to find version from build info
+		// Append short commit hash if available
 		for _, setting := range info.Settings {
-			if strings.HasPrefix(setting.Key, "vcs.revision") {
-				// Use first 7 characters of commit hash
-				if len(setting.Value) >= 7 {
-					version = "0.2.0" // Use semantic versioning
-					break
-				}
+			if setting.Key == "vcs.revision" && len(setting.Value) >= 7 {
+				version = fmt.Sprintf("%s-%s", version, setting.Value[:7])
+				break
 			}
 		}
 

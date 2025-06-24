@@ -177,3 +177,45 @@ func expandPath(path, homeDir string) string {
 	}
 	return path
 }
+
+// SaveConfig writes the configuration back to the config file
+func SaveConfig(cfg *Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	v := viper.New()
+	v.SetConfigType("toml")
+
+	v.Set("app.app_dir", cfg.AppDir)
+	v.Set("app.language", cfg.Language)
+	v.Set("app.wallets_dir", cfg.WalletsDir)
+	v.Set("app.database_path", cfg.DatabasePath)
+	v.Set("app.locale_dir", cfg.LocaleDir)
+
+	v.Set("fonts.available", cfg.Fonts)
+
+	v.Set("database.type", cfg.Database.Type)
+	v.Set("database.dsn", cfg.Database.DSN)
+
+	v.Set("security.argon2_time", cfg.Security.Argon2Time)
+	v.Set("security.argon2_memory", cfg.Security.Argon2Memory)
+	v.Set("security.argon2_threads", cfg.Security.Argon2Threads)
+	v.Set("security.argon2_key_len", cfg.Security.Argon2KeyLen)
+	v.Set("security.salt_length", cfg.Security.SaltLength)
+
+	if len(cfg.Networks) > 0 {
+		v.Set("networks", cfg.Networks)
+	}
+
+	if err := os.MkdirAll(cfg.AppDir, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	configPath := filepath.Join(cfg.AppDir, "config.toml")
+	if err := v.WriteConfigAs(configPath); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
