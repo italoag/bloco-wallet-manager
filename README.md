@@ -47,29 +47,20 @@
 **BLOCO Wallet Manager** is a command-line interface (CLI) application designed to manage cryptocurrency wallets compatible with the Ethereum network and adhering to the KeyStoreV3 standard. Developed in GoLang, BLOCO provides a Terminal User Interface (TUI) for seamless wallet management. Future integrations will include external vaults such as Hashicorp Vault, Amazon KMS, Cloud HSM, and Azure Key Vault.
 
 ### Features
-- **Wallet Management**
-    - Create new wallets compatible with Ethereum.
-    - Import wallets using Mnemonics.
-    - Export wallets in KeyStoreV3 format.
-    - Delete, block, and unblock wallet addresses.
-    - List all managed wallets.
-
-- **Security**
-    - Compatibility with KeyStoreV3 for secure key storage.
-    - Planned integration with external vaults:
-        - Hashicorp Vault
-        - Amazon KMS
-        - Cloud HSM
-        - Azure Key Vault
-
-- **Balance Inquiry**
-    - Query the balance of Ethereum-compatible wallets.
-
-- **Extensibility**
-    - Support for additional blockchain networks (future).
-    - Support for multiple cryptographic curves and signature algorithms:
-        - Curves: secp256k1, secp256r1, ed25519
-        - Algorithms: ECDSA, EdDSA
+- **Terminal User Interface**
+  - Navigable TUI built with Bubble Tea.
+  - Multi-language support (English, Portuguese and Spanish).
+  - Splash screen rendered with random ASCII fonts.
+- **Wallet Operations**
+  - Create new Ethereum wallets secured by password.
+  - Import wallets from mnemonic phrases or raw private keys.
+  - View wallet details after password verification.
+  - List and delete stored wallets.
+- **Persistence & Configuration**
+  - Wallet metadata stored in a local SQLite database.
+  - Keystore files saved in a configurable directory using KeyStoreV3.
+  - Application settings and fonts managed via YAML and JSON files.
+  - Logging to `blocowallet.log` for troubleshooting.
 
 ### Installation
 Ensure you have [Go](https://golang.org/doc/install) installed on your system.
@@ -95,10 +86,10 @@ blocowm
 
 Navigate through the TUI to manage your wallets. Available commands include:
 
-- **Create Wallet:** Initialize a new Ethereum-compatible wallet.
-- **Import Wallet:** Import existing wallets using Mnemonics.
-- **List Wallets:** Display all managed wallets.
-
+- **Create Wallet:** Generate a new Ethereum wallet.
+- **Import from Mnemonic:** Restore a wallet using a mnemonic phrase.
+- **Import from Private Key:** Load a wallet from a raw private key.
+- **List Wallets:** Display stored wallets and view details or delete them.
 ### Roadmap
 **Upcoming Features:**
 
