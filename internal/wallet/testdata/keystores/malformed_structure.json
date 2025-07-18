@@ -1,0 +1,27 @@
+{
+		"version": 3,
+		"id": "12345678-1234-1234-1234-123456789abc",
+		"address": "5d8c5d3a5e6f6d6c5b4a3a2b1c0d9e8f7a6b5c4d",
+		"crypto": {
+			"cipher": "aes-128-ctr",
+			"ciphertext": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			"cipherparams": {
+				"iv": "1234567890abcdef1234567890abcdef"
+			},
+			"kdf": "scrypt",
+			"kdfparams": {
+				"dklen": 32,
+				"n": 262144,
+				"p": 1,
+				"r": 8,
+				"salt": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+			},
+			"mac": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+		},
+		"extra": {
+			"nested": {
+				"field": "value",
+				"array": [1, 2, 3, 4, 5]
+			}
+		}
+	}
