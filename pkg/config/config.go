@@ -112,6 +112,22 @@ func LoadConfig(appDir string) (*Config, error) {
 			Argon2KeyLen:  v.GetUint32("security.argon2_key_len"),
 			SaltLength:    v.GetUint32("security.salt_length"),
 		},
+		Networks: make(map[string]Network),
+	}
+
+	// Load networks from config
+	networksMap := v.GetStringMap("networks")
+	for key := range networksMap {
+		networkKey := "networks." + key
+		network := Network{
+			Name:        v.GetString(networkKey + ".name"),
+			RPCEndpoint: v.GetString(networkKey + ".rpc_endpoint"),
+			ChainID:     v.GetInt64(networkKey + ".chain_id"),
+			Symbol:      v.GetString(networkKey + ".symbol"),
+			Explorer:    v.GetString(networkKey + ".explorer"),
+			IsActive:    v.GetBool(networkKey + ".is_active"),
+		}
+		cfg.Networks[key] = network
 	}
 
 	// Expand paths with ~ to home directory

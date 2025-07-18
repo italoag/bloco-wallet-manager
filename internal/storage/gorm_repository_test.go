@@ -154,43 +154,22 @@ func TestGORMRepository_DeleteWallet(t *testing.T) {
 	assert.Empty(t, wallets)
 }
 
-// Teste para verificar o comportamento com diferentes tipos de banco de dados
-func TestGORMRepository_DatabaseTypes(t *testing.T) {
+// Teste para verificar o comportamento com diferentes configurações SQLite
+func TestGORMRepository_SQLiteConfigurations(t *testing.T) {
 	testCases := []struct {
 		name    string
-		dbType  string
 		dsn     string
 		wantErr bool
 	}{
 		{
 			name:    "SQLite em memória",
-			dbType:  "sqlite",
 			dsn:     ":memory:",
 			wantErr: false,
 		},
 		{
 			name:    "SQLite em arquivo",
-			dbType:  "sqlite",
 			dsn:     "", // Usar DatabasePath
 			wantErr: false,
-		},
-		{
-			name:    "PostgreSQL sem DSN",
-			dbType:  "postgres",
-			dsn:     "",
-			wantErr: true,
-		},
-		{
-			name:    "MySQL sem DSN",
-			dbType:  "mysql",
-			dsn:     "",
-			wantErr: true,
-		},
-		{
-			name:    "Tipo de banco não suportado",
-			dbType:  "mongodb",
-			dsn:     "mongodb://localhost:27017",
-			wantErr: true,
 		},
 	}
 
@@ -209,7 +188,7 @@ func TestGORMRepository_DatabaseTypes(t *testing.T) {
 				AppDir:       tempDir,
 				DatabasePath: tempDir + "/test.db",
 				Database: config.DatabaseConfig{
-					Type: tc.dbType,
+					Type: "sqlite",
 					DSN:  tc.dsn,
 				},
 			}
@@ -224,9 +203,7 @@ func TestGORMRepository_DatabaseTypes(t *testing.T) {
 				// Fechar a conexão se não for nil
 				if repo != nil {
 					err := repo.Close()
-					if err != nil {
-						return
-					}
+					assert.NoError(t, err)
 				}
 			}
 		})

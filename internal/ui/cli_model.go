@@ -3,6 +3,7 @@ package ui
 import (
 	"blocowallet/internal/wallet"
 	"blocowallet/pkg/config"
+
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/digitallyserviced/tdfgo/tdf"
@@ -39,4 +40,5 @@ type CLIModel struct {
 	// Network components
 	networkListComponent NetworkListComponent // Componente de lista de redes
 	addNetworkComponent  AddNetworkComponent  // Componente de adição de rede
+	editingNetworkKey    string               // Chave da rede sendo editada
 }

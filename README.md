@@ -62,6 +62,12 @@
         - Cloud HSM
         - Azure Key Vault
 
+- **Configuration Management**
+    - Robust configuration file handling with atomic operations
+    - Automatic backup and restore capabilities
+    - Network configuration with proper TOML formatting
+    - Safe editing of configuration files
+
 - **Balance Inquiry**
     - Query the balance of Ethereum-compatible wallets.
 

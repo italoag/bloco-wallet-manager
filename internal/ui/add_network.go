@@ -293,6 +293,7 @@ func (c *AddNetworkComponent) Update(msg tea.Msg) (*AddNetworkComponent, tea.Cmd
 	case errorMsg:
 		c.SetError(fmt.Errorf("%s", string(msg)))
 		c.loadingSuggestions = false
+		c.adding = false
 
 	case tea.KeyMsg:
 		// Debug log removed
@@ -340,7 +341,31 @@ func (c *AddNetworkComponent) Update(msg tea.Msg) (*AddNetworkComponent, tea.Cmd
 			// Submit form if not in search mode
 			if !c.isSearchFocused && c.validateInputs() {
 				c.adding = true
+				c.err = fmt.Errorf("validating RPC endpoint...")
+
 				return c, func() tea.Msg {
+					// Validate RPC endpoint before submitting
+					rpcURL := c.GetRPCEndpoint()
+					if err := c.chainListService.ValidateRPCEndpoint(rpcURL); err != nil {
+						return errorMsg(fmt.Sprintf("RPC validation failed: %v", err))
+					}
+
+					// Verify chain ID matches
+					chainIDStr := c.chainIDInput.Value()
+					expectedChainID, err := strconv.ParseInt(chainIDStr, 10, 64)
+					if err != nil {
+						return errorMsg("Invalid chain ID format")
+					}
+
+					actualChainID, err := c.chainListService.GetChainIDFromRPC(rpcURL)
+					if err != nil {
+						return errorMsg(fmt.Sprintf("Failed to get chain ID from RPC: %v", err))
+					}
+
+					if int64(actualChainID) != expectedChainID {
+						return errorMsg(fmt.Sprintf("Chain ID mismatch: expected %d, got %d", expectedChainID, actualChainID))
+					}
+
 					return AddNetworkRequestMsg{
 						Name:        c.GetNetworkName(),
 						ChainID:     c.chainIDInput.Value(),

@@ -7,6 +7,14 @@ import (
 	"blocowallet/pkg/localization"
 	"bytes"
 	"fmt"
+	"io"
+	"log"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -14,12 +22,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/digitallyserviced/tdfgo/tdf"
 	"github.com/go-errors/errors"
-	"log"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 // Função para construir a lista de fontes disponíveis tanto do diretório customizado quanto das embutidas
@@ -833,15 +835,39 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			}
 
 			if err != nil {
-				m.err = errors.Wrap(err, 0)
-				log.Println(m.err.(*errors.Error).ErrorStack())
+				// Check if it's a KeystoreImportError
+				if keystoreErr, ok := err.(*wallet.KeystoreImportError); ok {
+					// Get localized error message
+					localizedMsg := localization.FormatKeystoreErrorWithField(
+						keystoreErr.GetLocalizedMessage(),
+						keystoreErr.Field,
+					)
 
-				// If it's a password error for keystore, stay on the password screen
-				if strings.Contains(err.Error(), "incorrect password for keystore") {
-					// Just show the error and stay on the password screen
-					return m, nil
+					// Add recovery suggestion based on error type
+					var recoverySuggestion string
+					switch keystoreErr.Type {
+					case wallet.ErrorFileNotFound:
+						recoverySuggestion = localization.Labels["keystore_recovery_file_not_found"]
+					case wallet.ErrorInvalidJSON:
+						recoverySuggestion = localization.Labels["keystore_recovery_invalid_json"]
+					case wallet.ErrorInvalidKeystore:
+						recoverySuggestion = localization.Labels["keystore_recovery_invalid_structure"]
+					case wallet.ErrorIncorrectPassword:
+						recoverySuggestion = localization.Labels["keystore_recovery_incorrect_password"]
+						// Stay on password screen for password errors
+						m.err = errors.Wrap(fmt.Errorf("%s\n%s", localizedMsg, recoverySuggestion), 0)
+						log.Println(m.err.(*errors.Error).ErrorStack())
+						return m, nil
+					default:
+						recoverySuggestion = localization.Labels["keystore_recovery_general"]
+					}
+
+					m.err = errors.Wrap(fmt.Errorf("%s\n%s", localizedMsg, recoverySuggestion), 0)
+				} else {
+					m.err = errors.Wrap(err, 0)
 				}
 
+				log.Println(m.err.(*errors.Error).ErrorStack())
 				m.currentView = constants.DefaultView
 				return m, nil
 			}
@@ -1051,14 +1077,80 @@ func (m *CLIModel) updateImportKeystore(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			keystorePath := strings.TrimSpace(m.privateKeyInput.Value())
 			if keystorePath == "" {
-				m.err = errors.Wrap(fmt.Errorf(localization.Labels["invalid_keystore"]), 0)
+				// Use specific error type for empty path
+				keystoreErr := wallet.NewKeystoreImportError(
+					wallet.ErrorFileNotFound,
+					"No keystore path provided",
+					nil,
+				)
+				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
+					keystoreErr.GetLocalizedMessage(),
+					"",
+				)), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
 				return m, nil
 			}
 
 			// Check if file exists
 			if _, err := os.Stat(keystorePath); os.IsNotExist(err) {
-				m.err = errors.Wrap(fmt.Errorf(localization.Labels["invalid_keystore"]), 0)
+				// Use specific error type for file not found
+				keystoreErr := wallet.NewKeystoreImportError(
+					wallet.ErrorFileNotFound,
+					fmt.Sprintf("Keystore file not found at path: %s", keystorePath),
+					err,
+				)
+				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
+					keystoreErr.GetLocalizedMessage(),
+					"",
+				)), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Check file extension
+			if !strings.HasSuffix(strings.ToLower(keystorePath), ".json") {
+				// Use specific error type for invalid file type
+				keystoreErr := wallet.NewKeystoreImportError(
+					wallet.ErrorInvalidKeystore,
+					fmt.Sprintf("File %s is not a JSON file", keystorePath),
+					nil,
+				)
+				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
+					keystoreErr.GetLocalizedMessage(),
+					"",
+				)), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Check file size to prevent memory exhaustion
+			fileInfo, err := os.Stat(keystorePath)
+			if err != nil {
+				keystoreErr := wallet.NewKeystoreImportError(
+					wallet.ErrorFileNotFound,
+					fmt.Sprintf("Error accessing keystore file: %s", keystorePath),
+					err,
+				)
+				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
+					keystoreErr.GetLocalizedMessage(),
+					"",
+				)), 0)
+				log.Println(m.err.(*errors.Error).ErrorStack())
+				return m, nil
+			}
+
+			// Limit file size to 100KB (reasonable for keystores)
+			const maxKeystoreSize = 100 * 1024 // 100KB
+			if fileInfo.Size() > maxKeystoreSize {
+				keystoreErr := wallet.NewKeystoreImportError(
+					wallet.ErrorInvalidKeystore,
+					fmt.Sprintf("Keystore file too large: %d bytes (max %d bytes)", fileInfo.Size(), maxKeystoreSize),
+					nil,
+				)
+				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
+					keystoreErr.GetLocalizedMessage(),
+					"",
+				)), 0)
 				log.Println(m.err.(*errors.Error).ErrorStack())
 				return m, nil
 			}
@@ -1503,8 +1595,8 @@ func (m *CLIModel) initListWallets() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
@@ -1569,20 +1661,23 @@ func (m *CLIModel) initWalletPassword() {
 
 // initLanguageSelection initializes the language selection view
 func (m *CLIModel) initLanguageSelection() {
-	// Load the current configuration
-	appDir := filepath.Join(os.Getenv("HOME"), ".wallets")
-	cfg, err := config.LoadConfig(appDir)
-	if err != nil {
-		m.err = errors.Wrap(err, 0)
-		m.currentView = constants.DefaultView
-		return
+	// Use the existing configuration if available
+	if m.currentConfig == nil {
+		// Load or create the configuration
+		appDir := filepath.Join(os.Getenv("HOME"), ".wallets")
+		cfg, err := loadOrCreateConfig(appDir)
+		if err != nil {
+			m.err = errors.Wrap(err, 0)
+			m.currentView = constants.DefaultView
+			return
+		}
+
+		// Store the current configuration
+		m.currentConfig = cfg
 	}
 
-	// Store the current configuration
-	m.currentConfig = cfg
-
 	// Set the menu items to the language menu items
-	m.menuItems = NewLanguageMenu(cfg)
+	m.menuItems = NewLanguageMenu(m.currentConfig)
 
 	// Reset the selected menu item
 	m.selectedMenu = 0
@@ -1622,31 +1717,22 @@ func (m *CLIModel) updateLanguageSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Otherwise, change the language
-			selectedLang := m.menuItems[m.selectedMenu].description
+			// Extract the language code from the description (format: "language: XX")
+			descParts := strings.Split(m.menuItems[m.selectedMenu].description, ": ")
+			if len(descParts) < 2 {
+				m.err = errors.Wrap(fmt.Errorf("invalid language selection format"), 0)
+				return m, nil
+			}
+
+			selectedLang := strings.TrimSpace(descParts[1])
 
 			// Update the configuration
 			if m.currentConfig != nil && selectedLang != m.currentConfig.Language {
 				// Get the config file path
 				configPath := filepath.Join(m.currentConfig.AppDir, "config.toml")
 
-				// Read the current config file
-				content, err := os.ReadFile(configPath)
-				if err != nil {
-					m.err = errors.Wrap(err, 0)
-					return m, nil
-				}
-
-				// Replace the language setting
-				lines := strings.Split(string(content), "\n")
-				for i, line := range lines {
-					if strings.HasPrefix(strings.TrimSpace(line), "language") {
-						lines[i] = fmt.Sprintf("language = \"%s\"", selectedLang)
-						break
-					}
-				}
-
-				// Write the updated config back to the file
-				err = os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+				// Atualizar o idioma no arquivo de configuração
+				err := updateLanguageInConfig(configPath, selectedLang)
 				if err != nil {
 					m.err = errors.Wrap(err, 0)
 					return m, nil
@@ -1661,6 +1747,18 @@ func (m *CLIModel) updateLanguageSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Update the current configuration
 				m.currentConfig = newCfg
+
+				// Reinitialize localization with the new language
+				err = localization.InitLocalization(newCfg)
+				if err != nil {
+					m.err = errors.Wrap(err, 0)
+					return m, nil
+				}
+
+				// Return to the config menu
+				m.menuItems = NewConfigMenu()
+				m.selectedMenu = 0
+				m.currentView = constants.ConfigurationView
 
 				// Reinitialize localization with the new language
 				err = localization.InitLocalization(newCfg)
@@ -1796,8 +1894,8 @@ func (m *CLIModel) rebuildWalletsTable() {
 		createdAt := w.CreatedAt.Format("2006-01-02 15:04")
 
 		rows = append(rows, table.Row{
-			fmt.Sprintf("%d", w.ID), 
-			w.Name, 
+			fmt.Sprintf("%d", w.ID),
+			w.Name,
 			walletType,
 			createdAt,
 			w.Address,
@@ -1836,4 +1934,30 @@ func (m *CLIModel) rebuildWalletsTable() {
 
 	// Atualizar dimensões da tabela
 	m.updateTableDimensions()
+}
+
+// copyFile copia um arquivo de origem para um arquivo de destino
+func copyFile(src, dst string) error {
+	// Abrir o arquivo de origem
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Criar o arquivo de destino
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Copiar o conteúdo
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Sincronizar para garantir que os dados sejam escritos no disco
+	return destFile.Sync()
 }

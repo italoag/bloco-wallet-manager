@@ -2,6 +2,7 @@ package ui
 
 import (
 	"blocowallet/internal/constants"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -16,6 +17,7 @@ type Styles struct {
 	MenuTitle          lipgloss.Style
 	MenuDesc           lipgloss.Style
 	ErrorStyle         lipgloss.Style
+	SuccessStyle       lipgloss.Style
 	WalletDetails      lipgloss.Style
 	StatusBar          lipgloss.Style
 	Splash             lipgloss.Style
@@ -73,7 +75,12 @@ func createStyles() Styles {
 			Foreground(lipgloss.Color("244")),
 		ErrorStyle: lipgloss.NewStyle().
 			Padding(1, 2).
-			Margin(1, constants.StyleMargin),
+			Margin(1, constants.StyleMargin).
+			Foreground(lipgloss.Color("#FF0000")),
+		SuccessStyle: lipgloss.NewStyle().
+			Padding(1, 2).
+			Margin(1, constants.StyleMargin).
+			Foreground(lipgloss.Color("#00AA00")),
 		WalletDetails: lipgloss.NewStyle().
 			Margin(1, constants.StyleMargin).
 			Padding(1, 2),

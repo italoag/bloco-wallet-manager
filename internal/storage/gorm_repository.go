@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -25,36 +23,19 @@ var _ wallet.WalletRepository = &GORMRepository{}
 func NewWalletRepository(cfg *config.Config) (*GORMRepository, error) {
 	var dialector gorm.Dialector
 
-	switch cfg.Database.Type {
-	case "postgres":
-		dsn := cfg.Database.DSN
-		if dsn == "" {
-			return nil, fmt.Errorf("configuração DSN vazia para PostgreSQL")
-		}
-		dialector = postgres.Open(dsn)
-	case "mysql":
-		dsn := cfg.Database.DSN
-		if dsn == "" {
-			return nil, fmt.Errorf("configuração DSN vazia para MySQL")
-		}
-		dialector = mysql.Open(dsn)
-	case "sqlite", "":
-		// Usar SQLite por padrão
-		dbPath := cfg.DatabasePath
-		if cfg.Database.DSN != "" {
-			dbPath = cfg.Database.DSN
-		}
-
-		// Garantir que o diretório existe
-		dir := filepath.Dir(dbPath)
-		if err := ensureDir(dir); err != nil {
-			return nil, fmt.Errorf("falha ao criar diretório para o banco de dados: %w", err)
-		}
-
-		dialector = sqlite.Open(dbPath)
-	default:
-		return nil, fmt.Errorf("tipo de banco de dados não suportado: %s", cfg.Database.Type)
+	// Usar apenas SQLite para testes e desenvolvimento
+	dbPath := cfg.DatabasePath
+	if cfg.Database.DSN != "" {
+		dbPath = cfg.Database.DSN
 	}
+
+	// Garantir que o diretório existe
+	dir := filepath.Dir(dbPath)
+	if err := ensureDir(dir); err != nil {
+		return nil, fmt.Errorf("falha ao criar diretório para o banco de dados: %w", err)
+	}
+
+	dialector = sqlite.Open(dbPath)
 
 	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {

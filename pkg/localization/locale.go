@@ -3,12 +3,13 @@ package localization
 import (
 	"blocowallet/pkg/config"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
-	"golang.org/x/text/language"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/BurntSushi/toml"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -532,6 +533,9 @@ func populateLabelsMap() error {
 		localizedString := Get(key)
 		Labels[key] = localizedString
 	}
+
+	// Add keystore validation messages
+	AddKeystoreValidationMessages()
 
 	return nil
 }

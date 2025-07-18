@@ -4,12 +4,14 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
-	"os"
-	"path/filepath"
 )
 
 type WalletDetails struct {
@@ -60,11 +62,17 @@ func (ws *WalletService) CreateWallet(name, password string) (*WalletDetails, er
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
+	// Encrypt the mnemonic before storing
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt mnemonic: %v", err)
+	}
+
 	wallet := &Wallet{
 		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
-		Mnemonic:     mnemonic, // Store the mnemonic
+		Mnemonic:     encryptedMnemonic, // Store the encrypted mnemonic
 	}
 
 	err = ws.Repo.AddWallet(wallet)
@@ -110,11 +118,17 @@ func (ws *WalletService) ImportWallet(name, mnemonic, password string) (*WalletD
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
+	// Encrypt the mnemonic before storing
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt mnemonic: %v", err)
+	}
+
 	wallet := &Wallet{
 		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
-		Mnemonic:     mnemonic, // Store the mnemonic
+		Mnemonic:     encryptedMnemonic, // Store the encrypted mnemonic
 	}
 
 	err = ws.Repo.AddWallet(wallet)
@@ -149,12 +163,10 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 		return nil, fmt.Errorf("invalid private key: %v", err)
 	}
 
-	// Generate a mnemonic from private key
-	privateKeyBytes, _ := hex.DecodeString(privateKeyHex)
-	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
-	mnemonic, err := bip39.NewMnemonic(entropy)
+	// Generate a deterministic mnemonic from private key
+	mnemonic, err := GenerateDeterministicMnemonic(privKey)
 	if err != nil {
-		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+		return nil, fmt.Errorf("error generating deterministic mnemonic: %v", err)
 	}
 
 	// Import the private key to keystore
@@ -172,12 +184,18 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 		return nil, fmt.Errorf("error renaming the wallet file: %v", err)
 	}
 
-	// Create the wallet entry with the generated mnemonic
+	// Encrypt the mnemonic before storing
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt mnemonic: %v", err)
+	}
+
+	// Create the wallet entry with the encrypted mnemonic
 	wallet := &Wallet{
 		Name:         name,
 		Address:      account.Address.Hex(),
 		KeyStorePath: newPath,
-		Mnemonic:     mnemonic, // Store the generated mnemonic
+		Mnemonic:     encryptedMnemonic, // Store the encrypted mnemonic
 	}
 
 	// Add wallet to repository
@@ -197,81 +215,154 @@ func (ws *WalletService) ImportWalletFromPrivateKey(name, privateKeyHex, passwor
 	return walletDetails, nil
 }
 
-func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password string) (*WalletDetails, error) {
-	// Read the keystore file
+// ImportWalletFromKeystoreV3 imports a wallet from a keystore v3 file with enhanced validation
+func (ws *WalletService) ImportWalletFromKeystoreV3(name, keystorePath, password string) (*WalletDetails, error) {
+	// Step 1: Validate file existence
+	if _, err := os.Stat(keystorePath); os.IsNotExist(err) {
+		return nil, NewKeystoreImportError(
+			ErrorFileNotFound,
+			"Keystore file not found at specified path",
+			err,
+		)
+	}
+
+	// Step 2: Read the keystore file
 	keyJSON, err := os.ReadFile(keystorePath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading the keystore file: %v", err)
+		return nil, NewKeystoreImportError(
+			ErrorFileNotFound,
+			"Error reading the keystore file",
+			err,
+		)
 	}
 
-	// Decrypt the keystore file to verify the password and extract the address
+	// Step 3: Validate keystore structure
+	validator := &KeystoreValidator{}
+	keystoreData, err := validator.ValidateKeystoreV3(keyJSON)
+	if err != nil {
+		// The validator already returns a KeystoreImportError
+		return nil, err
+	}
+
+	// Step 4: Decrypt the keystore file to verify the password and extract the private key
 	key, err := keystore.DecryptKey(keyJSON, password)
 	if err != nil {
-		return nil, fmt.Errorf("incorrect password for keystore file")
+		return nil, NewKeystoreImportError(
+			ErrorIncorrectPassword,
+			"Incorrect password for keystore file",
+			err,
+		)
 	}
 
-	// Get the address from the key
+	// Step 5: Verify that the decrypted private key matches the address in the keystore
+	derivedAddress := crypto.PubkeyToAddress(key.PrivateKey.PublicKey).Hex()
+
+	// Normalize addresses for comparison (ensure both have 0x prefix and are lowercase)
+	normalizedKeystoreAddress := common.HexToAddress(keystoreData.Address).Hex()
+	normalizedDerivedAddress := common.HexToAddress(derivedAddress).Hex()
+
+	if normalizedKeystoreAddress != normalizedDerivedAddress {
+		return nil, NewKeystoreImportError(
+			ErrorAddressMismatch,
+			fmt.Sprintf("Address mismatch: keystore address %s does not match derived address %s",
+				normalizedKeystoreAddress, normalizedDerivedAddress),
+			nil,
+		)
+	}
+
+	// Step 6: Generate a deterministic mnemonic from private key
+	mnemonic, err := GenerateAndValidateDeterministicMnemonic(key.PrivateKey)
+	if err != nil {
+		return nil, NewKeystoreImportError(
+			ErrorCorruptedFile,
+			"Error generating deterministic mnemonic",
+			err,
+		)
+	}
+
+	// Step 7: Create the destination filename with proper address format
 	address := key.Address.Hex()
+	destFilename := fmt.Sprintf("%s.json", address)
 
-	// Create the destination filename with 0x prefix
-	destFilename := fmt.Sprintf("0x%s.json", address[2:]) // Remove "0x" prefix if present and add it back
-
-	// Get the keystore directory
+	// Step 8: Get the keystore directory
 	var keystoreDir string
-
-	// Check if there are any accounts in the keystore
 	accounts := ws.KeyStore.Accounts()
 	if len(accounts) > 0 {
-		// Use the directory of the first account
 		keystoreDir = filepath.Dir(accounts[0].URL.Path)
 	} else {
-		// If there are no accounts, use a default path
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, fmt.Errorf("error getting user home directory: %v", err)
+			return nil, NewKeystoreImportError(
+				ErrorFileNotFound,
+				"Error getting user home directory",
+				err,
+			)
 		}
 		keystoreDir = filepath.Join(homeDir, ".wallets", "keystore")
+
+		// Ensure the directory exists
+		if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+			return nil, NewKeystoreImportError(
+				ErrorFileNotFound,
+				"Error creating keystore directory",
+				err,
+			)
+		}
 	}
 
-	// Create the destination path
+	// Step 9: Create the destination path
 	destPath := filepath.Join(keystoreDir, destFilename)
 
-	// Copy the keystore file to the destination
+	// Step 10: Copy the keystore file to the destination
 	destFile, err := os.Create(destPath)
 	if err != nil {
-		return nil, fmt.Errorf("error creating destination file: %v", err)
+		return nil, NewKeystoreImportError(
+			ErrorFileNotFound,
+			"Error creating destination file",
+			err,
+		)
 	}
 	defer destFile.Close()
 
 	// Write the keystore JSON to the destination file
 	_, err = destFile.Write(keyJSON)
 	if err != nil {
-		return nil, fmt.Errorf("error writing to destination file: %v", err)
+		return nil, NewKeystoreImportError(
+			ErrorFileNotFound,
+			"Error writing to destination file",
+			err,
+		)
 	}
 
-	// Generate a mnemonic from private key (for compatibility with the rest of the app)
-	privateKeyBytes := crypto.FromECDSA(key.PrivateKey)
-	entropy := crypto.Keccak256(privateKeyBytes)[:16] // Use first 16 bytes for BIP39 entropy
-	mnemonic, err := bip39.NewMnemonic(entropy)
+	// Step 11: Encrypt the mnemonic before storing
+	encryptedMnemonic, err := EncryptMnemonic(mnemonic, password)
 	if err != nil {
-		return nil, fmt.Errorf("error generating mnemonic: %v", err)
+		return nil, NewKeystoreImportError(
+			ErrorCorruptedFile,
+			"Failed to encrypt mnemonic",
+			err,
+		)
 	}
 
-	// Create the wallet entry
+	// Step 12: Create the wallet entry
 	wallet := &Wallet{
 		Name:         name,
 		Address:      address,
 		KeyStorePath: destPath,
-		Mnemonic:     mnemonic, // Store the generated mnemonic for compatibility
+		Mnemonic:     encryptedMnemonic,
 	}
 
-	// Add wallet to repository
+	// Step 13: Add wallet to repository
 	err = ws.Repo.AddWallet(wallet)
 	if err != nil {
-		return nil, err
+		return nil, NewKeystoreImportError(
+			ErrorCorruptedFile,
+			"Failed to add wallet to repository",
+			err,
+		)
 	}
 
-	// Return wallet details
+	// Step 14: Return wallet details
 	walletDetails := &WalletDetails{
 		Wallet:     wallet,
 		Mnemonic:   mnemonic,
@@ -280,6 +371,12 @@ func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password s
 	}
 
 	return walletDetails, nil
+}
+
+// ImportWalletFromKeystore is kept for backward compatibility
+// It calls the new ImportWalletFromKeystoreV3 function
+func (ws *WalletService) ImportWalletFromKeystore(name, keystorePath, password string) (*WalletDetails, error) {
+	return ws.ImportWalletFromKeystoreV3(name, keystorePath, password)
 }
 
 func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDetails, error) {
@@ -292,9 +389,15 @@ func (ws *WalletService) LoadWallet(wallet *Wallet, password string) (*WalletDet
 		return nil, fmt.Errorf("incorrect password")
 	}
 
+	// Decrypt the mnemonic
+	decryptedMnemonic, err := DecryptMnemonic(wallet.Mnemonic, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt mnemonic: %v", err)
+	}
+
 	walletDetails := &WalletDetails{
 		Wallet:     wallet,
-		Mnemonic:   wallet.Mnemonic,
+		Mnemonic:   decryptedMnemonic,
 		PrivateKey: key.PrivateKey,
 		PublicKey:  &key.PrivateKey.PublicKey,
 	}

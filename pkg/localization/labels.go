@@ -13,12 +13,15 @@ var Labels map[string]string
 // This function is kept for backward compatibility
 // It delegates to InitLocalization in locale.go
 func SetLanguage(lang string, appDir string) error {
+	// Set the current language
+	SetCurrentLanguage(lang)
+
 	// Create a minimal config for InitLocalization
 	cfg := &config.Config{
 		Language:  lang,
 		LocaleDir: appDir + "/locale",
 	}
-	
+
 	// Delegate to the new implementation
 	return InitLocalization(cfg)
 }

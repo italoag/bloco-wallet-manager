@@ -8,7 +8,7 @@ type Wallet struct {
 	Name         string    `gorm:"not null"`
 	Address      string    `gorm:"uniqueIndex;not null"`
 	KeyStorePath string    `gorm:"not null"`
-	Mnemonic     string    `gorm:"not null"`
+	Mnemonic     string    `gorm:"type:text"` // Removed NOT NULL constraint for migration compatibility
 	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
 }
 

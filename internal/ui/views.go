@@ -1,19 +1,24 @@
 package ui
 
 import (
+	"blocowallet/internal/blockchain"
 	"blocowallet/internal/constants"
 	"blocowallet/internal/wallet"
 	"blocowallet/pkg/localization"
 	"bytes"
+	"context"
 	"fmt"
+	"log"
+	"math/big"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/arsham/figurine/figurine"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/digitallyserviced/tdfgo/tdf"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/go-errors/errors"
-	"log"
-	"strings"
-	"time"
 )
 
 // viewCreateWalletName renderiza a visualização de entrada do nome da wallet
@@ -396,14 +401,41 @@ func (m *CLIModel) viewImportKeystore() string {
 	// Use MenuTitle style for the header
 	title := m.styles.MenuTitle.Render(localization.Labels["keystore_title"])
 	input := m.privateKeyInput.View()
+
 	// Instructions for the user
 	instructions := m.styles.MenuDesc.Render(localization.Labels["press_enter"] + " | Tab to show/cycle through suggestions")
+
+	// Add validation feedback for the current path
+	var validationMsg string
+	keystorePath := strings.TrimSpace(m.privateKeyInput.Value())
+
+	if keystorePath != "" {
+		// Check if file exists
+		if fileInfo, err := os.Stat(keystorePath); os.IsNotExist(err) {
+			// File doesn't exist
+			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_file_not_found"])
+		} else if err != nil {
+			// Error accessing file
+			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_access_error"])
+		} else if fileInfo.IsDir() {
+			// Path is a directory, not a file
+			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_is_directory"])
+		} else if !strings.HasSuffix(strings.ToLower(keystorePath), ".json") {
+			// Not a JSON file
+			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_not_json"])
+		} else {
+			// File exists and has .json extension
+			validationMsg = m.styles.SuccessStyle.Render(localization.Labels["keystore_file_valid"])
+		}
+	}
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
 		"",
 		input,
+		"",
+		validationMsg,
 		"",
 		instructions,
 	)
@@ -570,12 +602,83 @@ func (m *CLIModel) viewWalletDetails() string {
 				fmt.Sprintf("%-*s %s\n", 20, localization.Labels["ethereum_address"], m.walletDetails.Wallet.Address) +
 				fmt.Sprintf("%-*s 0x%x\n", 20, localization.Labels["private_key"], crypto.FromECDSA(m.walletDetails.PrivateKey)) +
 				fmt.Sprintf("%-*s %x\n", 20, localization.Labels["public_key"], crypto.FromECDSAPub(m.walletDetails.PublicKey)) +
-				fmt.Sprintf("%-*s %s\n\n", 20, localization.Labels["mnemonic_phrase_label"], m.walletDetails.Mnemonic) +
-				localization.Labels["press_esc"],
+				fmt.Sprintf("%-*s %s\n\n", 20, localization.Labels["mnemonic_phrase_label"], m.walletDetails.Mnemonic),
 		)
+
+		// Add balance information
+		view.WriteString(m.renderWalletBalances())
+
+		view.WriteString("\n" + localization.Labels["press_esc"])
 		return view.String()
 	}
 	return localization.Labels["select_wallet_prompt"]
+}
+
+// renderWalletBalances renders balance information for the wallet
+func (m *CLIModel) renderWalletBalances() string {
+	if m.walletDetails == nil {
+		return ""
+	}
+
+	var balanceView strings.Builder
+	balanceView.WriteString(lipgloss.NewStyle().Bold(true).Render("Balance Information:\n"))
+
+	// Create a simple provider for Ethereum mainnet
+	ethProvider, err := blockchain.NewEthereum("https://eth.llamarpc.com", 30*time.Second, "ETH", 18, "Ethereum")
+	if err != nil {
+		balanceView.WriteString("❌ Failed to connect to Ethereum network\n")
+		return balanceView.String()
+	}
+	defer ethProvider.Close()
+
+	// Get balance
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	balance, err := ethProvider.GetBalance(ctx, m.walletDetails.Wallet.Address)
+	if err != nil {
+		balanceView.WriteString("❌ Failed to fetch balance: " + err.Error() + "\n")
+		return balanceView.String()
+	}
+
+	// Convert Wei to ETH
+	ethBalance := new(big.Float)
+	ethBalance.SetString(balance.String())
+	ethBalance.Quo(ethBalance, big.NewFloat(1e18))
+
+	balanceView.WriteString(fmt.Sprintf("🔹 Ethereum Mainnet: %s ETH\n", ethBalance.Text('f', 6)))
+
+	// Add other networks if available
+	if m.currentConfig != nil && m.currentConfig.Networks != nil {
+		for _, network := range m.currentConfig.Networks {
+			if !network.IsActive || network.RPCEndpoint == "" {
+				continue
+			}
+
+			provider, err := blockchain.NewEthereum(network.RPCEndpoint, 10*time.Second, network.Symbol, 18, network.Name)
+			if err != nil {
+				balanceView.WriteString(fmt.Sprintf("❌ %s: Connection failed\n", network.Name))
+				continue
+			}
+
+			balance, err := provider.GetBalance(ctx, m.walletDetails.Wallet.Address)
+			provider.Close()
+
+			if err != nil {
+				balanceView.WriteString(fmt.Sprintf("❌ %s: %s\n", network.Name, err.Error()))
+				continue
+			}
+
+			// Convert to human readable format
+			tokenBalance := new(big.Float)
+			tokenBalance.SetString(balance.String())
+			tokenBalance.Quo(tokenBalance, big.NewFloat(1e18))
+
+			balanceView.WriteString(fmt.Sprintf("🔹 %s: %s %s\n", network.Name, tokenBalance.Text('f', 6), network.Symbol))
+		}
+	}
+
+	return balanceView.String()
 }
 
 // viewLanguageSelection renderiza a visualização de seleção de idioma
