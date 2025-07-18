@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "name": "Auto Update Documentation",
+  "name": "Auto Update Docs",
   "description": "Monitors changes to Go source files and other important project files, then prompts for documentation updates in README.md or the docs directory",
   "version": "1",
   "when": {

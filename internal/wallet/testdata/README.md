@@ -39,7 +39,7 @@ This directory contains sample keystore files for testing the keystore validatio
 ## Invalid Keystore Files
 
 - `invalid_version.json`: A keystore file with version 2 instead of 3
-- `invalid_json.json`: A keystore file with invalid JSON syntax
+- `invalid_json.json`: A keystore file with invalid JSON syntax (will trigger "O arquivo não contém um JSON válido" error)
 - `missing_address.json`: A keystore file missing the address field
 - `invalid_address.json`: A keystore file with an invalid address format
 - `missing_crypto.json`: A keystore file missing the crypto field
@@ -74,6 +74,28 @@ This will create various test keystore files in the `keystores` directory and up
 ## Usage in Tests
 
 These files can be used for testing the keystore validation and import functionality. The valid keystore files can be used to test successful imports, while the invalid keystore files can be used to test error handling.
+
+### Testing Files with Different Extensions
+
+As part of the flexible keystore import feature, the system now supports importing keystore files with any extension or no extension. The validation now focuses on the file content rather than the extension, with updated error messages in Portuguese:
+
+- For invalid JSON: "O arquivo não contém um JSON válido" (The file does not contain valid JSON)
+- For invalid keystore structure: "O arquivo não contém um keystore v3 válido" (The file does not contain a valid keystore v3)
+
+To test this functionality, you can create copies of the test files with different extensions:
+
+```bash
+# Create a copy with .key extension
+cp keystores/valid_keystore_v3.json keystores/valid_keystore_v3.key
+
+# Create a copy with no extension
+cp keystores/valid_keystore_v3.json keystores/valid_keystore_v3
+
+# Create a copy with a complex extension
+cp keystores/valid_keystore_v3.json keystores/valid_keystore_v3.keystoremaster
+```
+
+These files can be used to verify that the system correctly validates the content regardless of the file extension.
 
 Example:
 

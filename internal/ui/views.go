@@ -420,11 +420,10 @@ func (m *CLIModel) viewImportKeystore() string {
 		} else if fileInfo.IsDir() {
 			// Path is a directory, not a file
 			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_is_directory"])
-		} else if !strings.HasSuffix(strings.ToLower(keystorePath), ".json") {
-			// Not a JSON file
-			validationMsg = m.styles.ErrorStyle.Render(localization.Labels["keystore_not_json"])
+			// Removed file extension validation to allow any file extension
+			// The actual JSON content validation will be done by the wallet service
 		} else {
-			// File exists and has .json extension
+			// File exists
 			validationMsg = m.styles.SuccessStyle.Render(localization.Labels["keystore_file_valid"])
 		}
 	}

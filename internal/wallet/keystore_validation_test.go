@@ -474,11 +474,11 @@ func TestValidateAddress(t *testing.T) {
 // TestKeystoreImportErrorMethods tests the methods of KeystoreImportError
 func TestKeystoreImportErrorMethods(t *testing.T) {
 	// Test Error() method
-	err1 := NewKeystoreImportError(ErrorInvalidJSON, "Invalid JSON format", nil)
-	assert.Equal(t, "Invalid JSON format", err1.Error())
+	err1 := NewKeystoreImportError(ErrorInvalidJSON, "O arquivo não contém um JSON válido", nil)
+	assert.Equal(t, "O arquivo não contém um JSON válido", err1.Error())
 
-	err2 := NewKeystoreImportError(ErrorInvalidJSON, "Invalid JSON format", assert.AnError)
-	assert.Equal(t, "Invalid JSON format: assert.AnError general error for testing", err2.Error())
+	err2 := NewKeystoreImportError(ErrorInvalidJSON, "O arquivo não contém um JSON válido", assert.AnError)
+	assert.Equal(t, "O arquivo não contém um JSON válido: assert.AnError general error for testing", err2.Error())
 
 	// Test Unwrap() method
 	assert.Nil(t, err1.Unwrap())

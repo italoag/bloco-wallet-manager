@@ -23,6 +23,10 @@ The recent changes to `pkg/localization/keystore_messages_additions.go` enhance 
 4. **Comprehensive Message Sets**: Each language now has a complete set of messages covering:
    - Keystore file validation feedback
    - Recovery suggestions for various error scenarios
+   
+5. **Updated Error Messages**: Error messages now focus on file content rather than extension:
+   - "O arquivo não contém um JSON válido" (The file does not contain valid JSON)
+   - "O arquivo não contém um keystore v3 válido" (The file does not contain a valid keystore v3)
 
 ## Impact on User Experience
 

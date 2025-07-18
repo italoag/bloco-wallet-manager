@@ -827,7 +827,7 @@ func TestKeystoreImportErrorHandling(t *testing.T) {
 			name:          "Invalid JSON",
 			keystorePath:  createInvalidJSONFile(t, sourceDir),
 			password:      password,
-			expectedError: "Invalid JSON format",
+			expectedError: "O arquivo não contém um JSON válido",
 			errorType:     wallet.ErrorInvalidJSON,
 		},
 		{

@@ -92,7 +92,7 @@ func (kv *KeystoreValidator) ValidateKeystoreV3(data []byte) (*KeystoreV3, error
 
 	// Parse JSON
 	if err := json.Unmarshal(data, &keystore); err != nil {
-		return nil, NewKeystoreImportError(ErrorInvalidJSON, "Invalid JSON format in keystore file", err)
+		return nil, NewKeystoreImportError(ErrorInvalidJSON, "O arquivo não contém um JSON válido", err)
 	}
 
 	// Validate structure

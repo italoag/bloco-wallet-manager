@@ -50,6 +50,7 @@
 - **Wallet Management**
     - Create new wallets compatible with Ethereum.
     - Import wallets using Mnemonics.
+    - Import KeyStoreV3 wallets with any file extension or no extension.
     - Export wallets in KeyStoreV3 format.
     - Delete, block, and unblock wallet addresses.
     - List all managed wallets.

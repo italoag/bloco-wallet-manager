@@ -19,8 +19,8 @@ func DefaultCryptoMessages() map[string]string {
 
 		// Keystore import error messages
 		"keystore_file_not_found":     "Keystore file not found at the specified path",
-		"keystore_invalid_json":       "Invalid JSON format in keystore file",
-		"keystore_invalid_structure":  "File is not a valid keystore v3 format",
+		"keystore_invalid_json":       "O arquivo não contém um JSON válido",
+		"keystore_invalid_structure":  "O arquivo não contém um keystore v3 válido",
 		"keystore_invalid_version":    "Invalid keystore version, expected version 3",
 		"keystore_incorrect_password": "Incorrect password for the keystore file",
 		"keystore_corrupted_file":     "Keystore file is corrupted or damaged",
@@ -49,8 +49,8 @@ func DefaultCryptoMessagesPortuguese() map[string]string {
 
 		// Mensagens de erro para importação de keystore
 		"keystore_file_not_found":     "Arquivo keystore não encontrado no caminho especificado",
-		"keystore_invalid_json":       "Arquivo não é um JSON válido",
-		"keystore_invalid_structure":  "Arquivo não é um keystore v3 válido",
+		"keystore_invalid_json":       "O arquivo não contém um JSON válido",
+		"keystore_invalid_structure":  "O arquivo não contém um keystore v3 válido",
 		"keystore_invalid_version":    "Versão de keystore inválida, esperada versão 3",
 		"keystore_incorrect_password": "Senha incorreta para o arquivo keystore",
 		"keystore_corrupted_file":     "Arquivo keystore está corrompido ou danificado",
@@ -79,8 +79,8 @@ func DefaultCryptoMessagesSpanish() map[string]string {
 
 		// Mensajes de error para importación de keystore
 		"keystore_file_not_found":     "Archivo keystore no encontrado en la ruta especificada",
-		"keystore_invalid_json":       "El archivo no es un JSON válido",
-		"keystore_invalid_structure":  "El archivo no es un keystore v3 válido",
+		"keystore_invalid_json":       "El archivo no contiene un JSON válido",
+		"keystore_invalid_structure":  "El archivo no contiene un keystore v3 válido",
 		"keystore_invalid_version":    "Versión de keystore inválida, se esperaba versión 3",
 		"keystore_incorrect_password": "Contraseña incorrecta para el archivo keystore",
 		"keystore_corrupted_file":     "El archivo keystore está corrupto o dañado",

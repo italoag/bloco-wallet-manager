@@ -812,7 +812,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 			var name string
 			if m.currentView == constants.ImportWalletPasswordView && len(m.privateKeyInput.Value()) > 0 {
 				name = "Imported Private Key Wallet"
-			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+			} else if m.mnemonic != "" && m.currentView == constants.ImportWalletPasswordView {
 				// If mnemonic field contains a path to a keystore file
 				name = "Imported Keystore Wallet"
 			} else {
@@ -824,7 +824,7 @@ func (m *CLIModel) updateImportWalletPassword(msg tea.Msg) (tea.Model, tea.Cmd) 
 				// Import from private key
 				privateKey := strings.TrimSpace(m.privateKeyInput.Value())
 				walletDetails, err = m.Service.ImportWalletFromPrivateKey(name, privateKey, password)
-			} else if m.mnemonic != "" && strings.HasSuffix(m.mnemonic, ".json") {
+			} else if m.mnemonic != "" && m.currentView == constants.ImportWalletPasswordView {
 				// Import from keystore file
 				keystorePath := m.mnemonic // We stored the keystore path in the mnemonic field
 				walletDetails, err = m.Service.ImportWalletFromKeystore(name, keystorePath, password)
@@ -1107,21 +1107,8 @@ func (m *CLIModel) updateImportKeystore(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// Check file extension
-			if !strings.HasSuffix(strings.ToLower(keystorePath), ".json") {
-				// Use specific error type for invalid file type
-				keystoreErr := wallet.NewKeystoreImportError(
-					wallet.ErrorInvalidKeystore,
-					fmt.Sprintf("File %s is not a JSON file", keystorePath),
-					nil,
-				)
-				m.err = errors.Wrap(fmt.Errorf(localization.FormatKeystoreErrorWithField(
-					keystoreErr.GetLocalizedMessage(),
-					"",
-				)), 0)
-				log.Println(m.err.(*errors.Error).ErrorStack())
-				return m, nil
-			}
+			// Removed file extension validation to allow any file extension
+			// The actual JSON content validation will be done by the wallet service
 
 			// Check file size to prevent memory exhaustion
 			fileInfo, err := os.Stat(keystorePath)

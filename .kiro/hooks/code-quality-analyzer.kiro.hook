@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Code Quality Analyzer",
+  "description": "Analyzes code changes for potential improvements, focusing on code smells, SOLID principles, and best practices",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "**/*.go"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "You are a code quality expert reviewing changes to Go code in the BLOCO Wallet Manager project.\n\nAnalyze the modified code for:\n1. Code smells (duplicated code, long methods, large classes, etc.)\n2. SOLID principle violations (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion)\n3. Object Calisthenics rules (one level of indentation, no else keyword, wrap primitives, etc.)\n4. Domain Driven Design (using the concept of rich domain model, avoiding anemic objects)\n5. Go best practices and idiomatic patterns\n6. Potential performance optimizations\n7. Improved error handling\n8. Better naming conventions\n9. Opportunities for better abstraction or design patterns\n10. Test coverage improvements\n\nFor each issue found:\n- Explain the problem clearly\n- Provide a specific code example showing how to improve it\n- Explain why your suggestion is better in terms of readability, maintainability, or performance\n\nFocus on providing actionable, high-value suggestions that maintain existing functionality while improving code quality. Be concise but thorough in your analysis."
+  }
+}
